@@ -1,0 +1,13 @@
+name: speckit-librarian
+hooks:
+  - phase: converge
+    priority: 100
+    context: SKILL.md
+    instructions: |
+      - Read all artifacts in the current feature's `specs/###-feature/` directory (spec.md, plan.md, tasks.md, and any other documents) as **knowledge input sources** — extract architectural decisions, design intent, and implementation context from them
+      - Read `memory/system-map.md` and update all modified artifact entries
+      - Read "Documentation State Matrix" from `plan.md` and execute each action
+      - Create/update ADRs in `docs/adr/` directory using Michael Nygard format
+      - Update `memory/system-map.md` status fields, timestamps, and new artifact entries
+      - Close all Gap Analysis items from plan.md
+      - **NEVER** add `specs/` entries to `memory/system-map.md` — specs are transient artifacts; only the permanent documents produced by distillation belong in the system map

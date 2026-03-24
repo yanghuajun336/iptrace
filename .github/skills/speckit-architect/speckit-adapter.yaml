@@ -1,0 +1,20 @@
+name: speckit-architect
+hooks:
+  - phase: plan
+    priority: 100
+    context: SKILL.md
+    instructions: |
+      - Read `memory/system-map.md` to identify touched components and their documentation status
+      - Read `memory/constitution.md` for governance principles and development lifecycle
+      - Add entries to plan.md "Documentation State Matrix" for impacted documents
+      - Run Gap Analysis against system-map.md Essential Artifacts list
+      - Add Bootstrapping Tasks for any missing essential artifacts
+
+      ## Diagrams
+
+      Apply the **Diagram Matrix** in SKILL.md (`## Diagram Matrix`) to decide which diagrams to
+      create. Evaluate each trigger condition against the current feature spec.
+
+      `$FEATURE_DIR` is the absolute path to the feature's spec directory — obtain it from
+      `check-prerequisites --json` output. Pass it to the initialization scripts documented in
+      SKILL.md (`## Scripts`) before writing any diagram file.

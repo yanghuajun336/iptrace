@@ -1,0 +1,11 @@
+name: speckit-tech-lead
+hooks:
+  - phase: tasks
+    priority: 100
+    context: SKILL.md
+    instructions: |
+      - Read `plan.md` "Skill Alignment Strategy" and "Relevant System Context"
+      - Follow `templates/tasks-template.md` structure for task generation
+      - Generate Phase N-1 (Polish) and Phase N (Convergence) tasks based on Documentation State Matrix
+      - Insert `<!-- CONVERGENCE_BOUNDARY -->` between Phase N-1 and Phase N
+      - Assign `[Skill: speckit-librarian]` to all Phase N tasks

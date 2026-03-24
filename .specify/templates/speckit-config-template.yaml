@@ -1,0 +1,22 @@
+# SpecKit Configuration
+# This file customizes SpecKit behavior for your project.
+# Place as `.speckit.yaml` in your repository root.
+
+# SpecKit version this project was initialized with
+# A soft warning is emitted if the installed version is incompatible
+version: "2.0.0"
+
+# Skills configuration
+skills:
+  # Directories to scan for skills (relative to repo root)
+  # Default: [.github/skills/, .claude/skills/]
+  scan_dirs:
+    - .github/skills/
+    - .claude/skills/
+
+# Memory configuration
+memory:
+  # Path to the system map file (relative to repo root)
+  system_map: .specify/memory/system-map.md
+  # Path to the constitution file (relative to repo root)
+  constitution: .specify/memory/constitution.md
