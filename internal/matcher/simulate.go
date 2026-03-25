@@ -40,14 +40,13 @@ func Simulate(packet model.Packet, rs model.RuleSet) (model.TraceResult, error) 
 				}
 				if matched {
 					step.Action = strings.ToUpper(rule.Target)
-					result.Steps = append(result.Steps, step)
-					if step.Action == "DROP" || step.Action == "ACCEPT" || step.Action == "REJECT" {
-						result.Verdict = step.Action
-						result.VerdictRule = &result.Steps[len(result.Steps)-1]
-						return result, nil
-					}
 				}
 				result.Steps = append(result.Steps, step)
+				if matched && isTerminalAction(step.Action) {
+					result.Verdict = step.Action
+					result.VerdictRule = &result.Steps[len(result.Steps)-1]
+					return result, nil
+				}
 			}
 			if chain.DefaultPolicy != "" {
 				result.DefaultPolicyApplied = true
@@ -89,4 +88,8 @@ func ValidateRuleSet(rs model.RuleSet) error {
 		return fmt.Errorf("ruleset has no table")
 	}
 	return nil
+}
+
+func isTerminalAction(action string) bool {
+	return action == "DROP" || action == "ACCEPT" || action == "REJECT"
 }

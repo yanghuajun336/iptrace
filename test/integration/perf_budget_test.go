@@ -22,7 +22,7 @@ func TestOfflineCheck_PerfBudget1000Rules(t *testing.T) {
 	}
 	b.WriteString("-A INPUT -s 1.2.3.4 -p tcp --dport 8080 -j DROP\nCOMMIT\n")
 
-	packet := model.Packet{Protocol: "tcp", SrcIP: "1.2.3.4", DstIP: "10.0.0.1", DstPort: 8080}
+	packet := model.Packet{Protocol: "tcp", SrcIP: "1.2.3.4", DstIP: "10.0.0.1", SrcPort: 12345, DstPort: 8080}
 
 	start := time.Now()
 	ruleset, err := parser.ParseIPTablesSave(strings.NewReader(b.String()))
@@ -96,7 +96,11 @@ func TestTrace_MemoryBudget(t *testing.T) {
 	if count == 0 {
 		t.Fatal("expect trace session to emit events")
 	}
-	if delta := after.Alloc - before.Alloc; delta > 50*1024*1024 {
+	delta := int64(after.Alloc) - int64(before.Alloc)
+	if delta < 0 {
+		delta = 0
+	}
+	if delta > 50*1024*1024 {
 		t.Fatalf("memory growth exceeded budget: %d bytes", delta)
 	}
 }
@@ -109,7 +113,7 @@ func BenchmarkOfflineCheck1000Rules(b *testing.B) {
 	}
 	rules.WriteString("-A INPUT -s 1.2.3.4 -p tcp --dport 8080 -j DROP\nCOMMIT\n")
 
-	packet := model.Packet{Protocol: "tcp", SrcIP: "1.2.3.4", DstIP: "10.0.0.1", DstPort: 8080}
+	packet := model.Packet{Protocol: "tcp", SrcIP: "1.2.3.4", DstIP: "10.0.0.1", SrcPort: 12345, DstPort: 8080}
 
 	b.ReportAllocs()
 	for i := 0; i < b.N; i++ {

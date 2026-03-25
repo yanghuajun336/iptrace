@@ -9,9 +9,12 @@ import (
 
 func TestExportRules(t *testing.T) {
 	outFile := filepath.Join(t.TempDir(), "snapshot.rules")
-	n, err := ExportRules(outFile, true)
+	backend, n, err := ExportRules(outFile, true)
 	if err != nil {
 		t.Fatalf("export failed: %v", err)
+	}
+	if backend == "" {
+		t.Fatal("expect backend to be detected")
 	}
 	if n == 0 {
 		t.Fatalf("expect rule count > 0")

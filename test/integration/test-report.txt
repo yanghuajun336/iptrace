@@ -1,0 +1,10 @@
+ok  	iptrace/cmd/iptrace	0.004s
+ok  	iptrace/internal/backend	0.002s
+ok  	iptrace/internal/exporter	0.004s
+ok  	iptrace/internal/matcher	0.005s
+ok  	iptrace/internal/output	0.004s
+ok  	iptrace/internal/parser	0.005s
+ok  	iptrace/internal/tracer	0.004s
+ok  	iptrace/pkg/model	0.003s
+ok  	iptrace/test/contract	1.093s
+ok  	iptrace/test/integration	2.083s

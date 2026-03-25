@@ -116,11 +116,11 @@
 
 **Purpose**: 跨用户故事的质量收敛、性能与一致性强化
 
-- [ ] T040 [P] [Skill: speckit-developer] 增加性能基准测试 `test/integration/perf_budget_test.go`（SC-003/SC-006/SC-007）
-- [ ] T041 [Skill: speckit-developer] 统一 CLI 错误文案与帮助信息 `cmd/iptrace/main.go` + `internal/output/errors.go`
-- [ ] T042 [P] [Skill: speckit-developer] 重构重复逻辑并清理技术债 `internal/{parser,matcher,tracer,exporter}/`
-- [ ] T043 [Skill: speckit-developer] 完成 quickstart 冒烟验证 `specs/001-packet-trace/quickstart.md`（逐命令执行核对）
-- [ ] T044 [Skill: speckit-developer] 执行全量测试并记录结果 `go test ./...`（输出保存至 `test/integration/test-report.txt`）
+- [x] T040 [P] [Skill: speckit-developer] 增加性能基准测试 `test/integration/perf_budget_test.go`（SC-003/SC-006/SC-007）
+- [x] T041 [Skill: speckit-developer] 统一 CLI 错误文案与帮助信息 `cmd/iptrace/main.go` + `internal/output/errors.go`
+- [x] T042 [P] [Skill: speckit-developer] 重构重复逻辑并清理技术债 `internal/{parser,matcher,tracer,exporter}/`
+- [x] T043 [Skill: speckit-developer] 完成 quickstart 冒烟验证 `specs/001-packet-trace/quickstart.md`（逐命令执行核对）
+- [x] T044 [Skill: speckit-developer] 执行全量测试并记录结果 `go test ./...`（输出保存至 `test/integration/test-report.txt`）
 
 <!-- CONVERGENCE_BOUNDARY -->
 

@@ -1,8 +1,6 @@
 package main
 
 import (
-	"flag"
-	"fmt"
 	"os"
 
 	"iptrace/internal/exporter"
@@ -10,28 +8,36 @@ import (
 )
 
 func runExport(args []string) int {
-	fs := flag.NewFlagSet("export", flag.ExitOnError)
+	fs := newFlagSet("export")
 	outFile := fs.String("output", "", "output rules file")
 	format := fs.String("format", "human", "output format: human|json")
-	_ = fs.Parse(args)
+	if err := fs.Parse(args); err != nil {
+		return exitWith(output.NewInputError(err.Error(), output.HintForError("missing_output_file")))
+	}
+	selectedFormat, err := parseFormat(*format)
+	if err != nil {
+		return exitWith(err)
+	}
 
 	if *outFile == "" {
-		fmt.Fprintln(os.Stderr, "error: --output is required")
-		return output.ExitCodeInputError
+		return exitWith(output.NewInputError("--output is required", output.HintForError("missing_output_file")))
 	}
 
-	testMode := os.Getenv("IPTRACE_TEST_MODE") == "1"
-	ruleCount, err := exporter.ExportRules(*outFile, testMode)
+	backend, ruleCount, err := exporter.ExportRules(*outFile, testModeEnabled())
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "error: export failed: %v\n", err)
-		return output.ExitCodeInternalErr
+		return exitWith(output.NewInternalError("export failed: "+err.Error(), ""))
 	}
+	summary := output.ExportSummary{Status: "ok", Backend: string(backend), RuleCount: ruleCount, OutputFile: *outFile}
 
-	if *format == "json" {
-		fmt.Printf("{\"status\":\"ok\",\"rule_count\":%d,\"output_file\":%q}\n", ruleCount, *outFile)
+	if selectedFormat == formatJSON {
+		text, err := output.RenderExportSummaryJSON(summary)
+		if err != nil {
+			return exitWith(output.NewInternalError("render export summary failed: "+err.Error(), ""))
+		}
+		_, _ = os.Stdout.WriteString(text + "\n")
 		return output.ExitCodeOK
 	}
 
-	fmt.Println(output.RenderExportSummaryHuman(ruleCount, *outFile))
+	_, _ = os.Stdout.WriteString(output.RenderExportSummaryHuman(summary) + "\n")
 	return output.ExitCodeOK
 }

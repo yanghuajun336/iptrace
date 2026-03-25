@@ -2,8 +2,6 @@ package main
 
 import (
 	"errors"
-	"flag"
-	"fmt"
 	"os"
 
 	"iptrace/internal/matcher"
@@ -13,7 +11,7 @@ import (
 )
 
 func runCheck(args []string) int {
-	fs := flag.NewFlagSet("check", flag.ExitOnError)
+	fs := newFlagSet("check")
 	src := fs.String("src", "", "source ip")
 	dst := fs.String("dst", "", "destination ip")
 	proto := fs.String("proto", "", "protocol")
@@ -21,17 +19,19 @@ func runCheck(args []string) int {
 	dport := fs.Uint("dport", 0, "destination port")
 	rulesFile := fs.String("rules-file", "", "rules file path")
 	format := fs.String("format", "human", "output format: human|json")
-	_ = fs.Parse(args)
+	if err := fs.Parse(args); err != nil {
+		return exitWith(output.NewInputError(err.Error(), output.HintForError("invalid_packet")))
+	}
+	selectedFormat, err := parseFormat(*format)
+	if err != nil {
+		return exitWith(err)
+	}
 
 	if *src == "" || *dst == "" || *proto == "" {
-		fmt.Fprintln(os.Stderr, "error: --src, --dst, --proto are required")
-		fmt.Fprintf(os.Stderr, "hint: %s\n", output.HintForError("invalid_packet"))
-		return output.ExitCodeInputError
+		return exitWith(output.NewInputError("--src, --dst, --proto are required", output.HintForError("invalid_packet")))
 	}
 	if *rulesFile == "" {
-		fmt.Fprintln(os.Stderr, "error: --rules-file is required")
-		fmt.Fprintf(os.Stderr, "hint: %s\n", output.HintForError("missing_rules_file"))
-		return output.ExitCodeInputError
+		return exitWith(output.NewInputError("--rules-file is required", output.HintForError("missing_rules_file")))
 	}
 
 	packet := model.Packet{
@@ -42,47 +42,38 @@ func runCheck(args []string) int {
 		DstPort:  uint16(*dport),
 	}
 	if err := packet.Validate(); err != nil {
-		fmt.Fprintf(os.Stderr, "error: %v\n", err)
-		fmt.Fprintf(os.Stderr, "hint: %s\n", output.HintForError("invalid_packet"))
-		return output.ExitCodeInputError
+		return exitWith(output.NewInputError(err.Error(), output.HintForError("invalid_packet")))
 	}
 
 	f, err := os.Open(*rulesFile)
 	if err != nil {
 		if errors.Is(err, os.ErrNotExist) {
-			fmt.Fprintf(os.Stderr, "error: rules file %q not found\n", *rulesFile)
-			fmt.Fprintf(os.Stderr, "hint: %s\n", output.HintForError("missing_rules_file"))
-			return output.ExitCodeEnvError
+			return exitWith(output.NewEnvError("rules file \""+*rulesFile+"\" not found", output.HintForError("missing_rules_file")))
 		}
-		fmt.Fprintf(os.Stderr, "error: open rules file failed: %v\n", err)
-		return output.ExitCodeInternalErr
+		return exitWith(output.NewInternalError("open rules file failed: "+err.Error(), ""))
 	}
 	defer f.Close()
 
 	ruleset, err := parser.ParseIPTablesSave(f)
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "error: parse rules failed: %v\n", err)
-		fmt.Fprintf(os.Stderr, "hint: %s\n", output.HintForError("parse_rules_failed"))
-		return output.ExitCodeInternalErr
+		return exitWith(output.NewInternalError("parse rules failed: "+err.Error(), output.HintForError("parse_rules_failed")))
 	}
 	ruleset.Backend = model.BackendLegacy
 
 	result, err := matcher.Simulate(packet, ruleset)
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "error: simulate failed: %v\n", err)
-		return output.ExitCodeInternalErr
+		return exitWith(output.NewInternalError("simulate failed: "+err.Error(), ""))
 	}
 
-	if *format == "json" {
+	if selectedFormat == formatJSON {
 		text, err := output.RenderJSON(result)
 		if err != nil {
-			fmt.Fprintf(os.Stderr, "error: json render failed: %v\n", err)
-			return output.ExitCodeInternalErr
+			return exitWith(output.NewInternalError("json render failed: "+err.Error(), ""))
 		}
-		fmt.Println(text)
+		_, _ = os.Stdout.WriteString(text + "\n")
 		return output.ExitCodeOK
 	}
 
-	fmt.Print(output.RenderHuman(result))
+	_, _ = os.Stdout.WriteString(output.RenderHuman(result))
 	return output.ExitCodeOK
 }

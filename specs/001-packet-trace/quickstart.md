@@ -47,6 +47,7 @@ iptrace check \
   --src 1.2.3.4 \
   --dst 10.0.0.1 \
   --proto tcp \
+  --sport 12345 \
   --dport 8080 \
   --rules-file snapshot.rules
 ```
@@ -55,7 +56,7 @@ iptrace check \
 
 ```
 Backend:    iptables-legacy
-Packet:     tcp 1.2.3.4:0 → 10.0.0.1:8080
+Packet:     tcp 1.2.3.4:12345 → 10.0.0.1:8080
 
 Step  Hook      Table   Chain   Rule  Action
 ----  --------  ------  ------  ----  ------
@@ -69,7 +70,7 @@ Verdict: DROP
 ### 获取 JSON 输出
 
 ```bash
-iptrace check --src 1.2.3.4 --dst 10.0.0.1 --proto tcp --dport 8080 \
+iptrace check --src 1.2.3.4 --dst 10.0.0.1 --proto tcp --sport 12345 --dport 8080 \
   --rules-file snapshot.rules --format json | jq .verdict
 # "DROP"
 ```

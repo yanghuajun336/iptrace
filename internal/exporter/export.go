@@ -1,8 +1,10 @@
 package exporter
 
 import (
-	"fmt"
 	"os"
+	"strings"
+
+	"iptrace/pkg/model"
 )
 
 const sampleRules = `*filter
@@ -11,14 +13,28 @@ const sampleRules = `*filter
 COMMIT
 `
 
-func ExportRules(outputPath string, testMode bool) (int, error) {
+func ExportRules(outputPath string, testMode bool) (model.Backend, int, error) {
 	content := sampleRules
+	backend := detectBackend(testMode)
 	if err := os.WriteFile(outputPath, []byte(content), 0o644); err != nil {
-		return 0, err
+		return model.BackendUnknown, 0, err
 	}
-	return 1, nil
+	return backend, countRules(content), nil
 }
 
-func ExportSummary(ruleCount int, outputFile string) string {
-	return fmt.Sprintf("Exported %d rules to %s", ruleCount, outputFile)
+func detectBackend(testMode bool) model.Backend {
+	if testMode {
+		return model.BackendLegacy
+	}
+	return model.BackendLegacy
+}
+
+func countRules(content string) int {
+	count := 0
+	for _, line := range strings.Split(content, "\n") {
+		if strings.HasPrefix(strings.TrimSpace(line), "-A ") {
+			count++
+		}
+	}
+	return count
 }

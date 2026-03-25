@@ -2,8 +2,6 @@ package main
 
 import (
 	"context"
-	"flag"
-	"fmt"
 	"os"
 	"time"
 
@@ -12,7 +10,7 @@ import (
 )
 
 func runTrace(args []string) int {
-	fs := flag.NewFlagSet("trace", flag.ExitOnError)
+	fs := newFlagSet("trace")
 	_ = fs.String("src", "", "source ip filter")
 	_ = fs.String("dst", "", "destination ip filter")
 	_ = fs.String("proto", "", "protocol filter")
@@ -20,15 +18,18 @@ func runTrace(args []string) int {
 	_ = fs.Uint("dport", 0, "destination port filter")
 	format := fs.String("format", "human", "output format: human|json")
 	timeout := fs.Duration("timeout", 2*time.Second, "trace timeout")
-	_ = fs.Parse(args)
+	if err := fs.Parse(args); err != nil {
+		return exitWith(output.NewInputError(err.Error(), output.HintForError("invalid_packet")))
+	}
+	selectedFormat, err := parseFormat(*format)
+	if err != nil {
+		return exitWith(err)
+	}
 
-	testMode := os.Getenv("IPTRACE_TEST_MODE") == "1"
-	forceNotRoot := os.Getenv("IPTRACE_FORCE_NOT_ROOT") == "1"
-	isRoot := os.Geteuid() == 0 && !forceNotRoot
+	testMode := testModeEnabled()
+	isRoot := os.Geteuid() == 0 && !forceNotRoot()
 	if !isRoot && !testMode {
-		fmt.Fprintln(os.Stderr, "error: trace requires root privileges")
-		fmt.Fprintln(os.Stderr, "hint: try: sudo iptrace trace ...")
-		return output.ExitCodeEnvError
+		return exitWith(output.NewEnvError("trace requires root privileges", output.HintForError("trace_requires_root")))
 	}
 
 	s := tracer.NewSession(tracer.SessionOptions{TestMode: testMode})
@@ -36,22 +37,20 @@ func runTrace(args []string) int {
 	defer cancel()
 	events, err := s.Start(ctx)
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "error: start trace session failed: %v\n", err)
-		return output.ExitCodeInternalErr
+		return exitWith(output.NewInternalError("start trace session failed: "+err.Error(), ""))
 	}
 	defer s.Stop()
 
 	for step := range events {
-		if *format == "json" {
+		if selectedFormat == formatJSON {
 			line, err := output.RenderStepNDJSON(step)
 			if err != nil {
-				fmt.Fprintf(os.Stderr, "error: render step json failed: %v\n", err)
-				return output.ExitCodeInternalErr
+				return exitWith(output.NewInternalError("render step json failed: "+err.Error(), ""))
 			}
-			fmt.Println(line)
+			_, _ = os.Stdout.WriteString(line + "\n")
 			continue
 		}
-		fmt.Println(output.RenderStepHuman(step))
+		_, _ = os.Stdout.WriteString(output.RenderStepHuman(step) + "\n")
 	}
 
 	return output.ExitCodeOK
