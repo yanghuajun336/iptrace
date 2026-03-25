@@ -1,0 +1,4 @@
+*filter
+:INPUT ACCEPT [0:0]
+-A INPUT -s 1.2.3.4 -p tcp --dport 8080 -j DROP
+COMMIT

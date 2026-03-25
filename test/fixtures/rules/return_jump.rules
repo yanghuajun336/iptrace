@@ -1,0 +1,6 @@
+*filter
+:INPUT ACCEPT [0:0]
+:MYCHAIN - [0:0]
+-A INPUT -p tcp --dport 8080 -j MYCHAIN
+-A MYCHAIN -s 1.2.3.4 -j RETURN
+COMMIT

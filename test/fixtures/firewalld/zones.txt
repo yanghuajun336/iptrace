@@ -1,0 +1,3 @@
+public
+  services: ssh dhcpv6-client
+  ports: 8080/tcp
