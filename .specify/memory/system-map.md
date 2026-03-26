@@ -3,7 +3,7 @@
 **Purpose**: Centralized index of all authoritative documentation for the project. Enables AI agents to quickly locate relevant context without scanning the entire codebase.
 
 **Template Version**: 2.0.0
-**Version**: 1.0.0 | **Created**: 2026-03-25 | **Last Updated**: 2026-03-26
+**Version**: 1.2.0 | **Created**: 2026-03-25 | **Last Updated**: 2026-03-27
 **Maintained By**: iptrace Maintainers
 **Review Frequency**: After each major feature completion
 
@@ -69,7 +69,7 @@ Add rows that are relevant; remove or leave empty categories that don't apply.
 | Artifact | Location | Status | Last Updated | Description |
 |----------|----------|--------|--------------|-------------|
 | Project Constitution | .specify/memory/constitution.md | ✅ Active | 2026-03-25 | 项目治理原则、质量标准与性能约束 |
-| Architecture Overview | docs/architecture/iptrace-overview.md | ✅ Active | 2026-03-26 | iptrace 组件边界、关键流程与演进路线 |
+| Architecture Overview | docs/architecture/iptrace-overview.md | ✅ Active | 2026-03-27 | iptrace 组件边界、关键流程与演进路线 |
 | Trace Mechanism ADR | docs/adr/0001-trace-mechanism.md | ✅ Active | 2026-03-26 | 在线追踪机制选型与后续补充策略 |
 | Language & Dependency ADR | docs/adr/0002-language-and-dependency-policy.md | ✅ Active | 2026-03-26 | Go 主实现与最小依赖治理策略 |
 
@@ -79,6 +79,7 @@ Add rows that are relevant; remove or leave empty categories that don't apply.
 |----------|----------|--------|--------------|-------------|
 | Speckit Config | .speckit.yaml | ✅ Active | 2026-03-25 | 技能扫描目录与项目记忆路径配置 |
 | Workspace Settings | .vscode/settings.json | ✅ Active | 2026-03-25 | 编辑器行为与工作区配置 |
+| Build Entry | Makefile | ✅ Active | 2026-03-26 | 提供 `build` / `test` / `fmt` 开发入口 |
 
 ### 🧪 Quality & Testing
 
@@ -87,7 +88,7 @@ Add rows that are relevant; remove or leave empty categories that don't apply.
 | Tasks Template | .specify/templates/tasks-template.md | ✅ Active | 2026-03-25 | 定义测试先行、阶段执行与收敛验证模式 |
 | Plan Template | .specify/templates/plan-template.md | ✅ Active | 2026-03-25 | 包含 Constitution Check 与技术上下文门禁 |
 | Performance Baseline | docs/performance/iptrace-baseline.md | ✅ Active | 2026-03-26 | 收敛后的性能预算与验证基线 |
-| TDD Traceability | docs/quality/tdd-traceability.md | ✅ Active | 2026-03-26 | 任务—测试—实现可追溯矩阵 |
+| TDD Traceability | docs/quality/tdd-traceability.md | ✅ Active | 2026-03-27 | 任务—测试—实现可追溯矩阵（含 T048~T055 UX 改进与规则文本/五元组映射） |
 
 ### 🧭 Project Memory
 
@@ -108,7 +109,7 @@ Add rows that are relevant; remove or leave empty categories that don't apply.
 |----------|----------|--------|--------------|-------------|
 | Constitution Agent Guide | .github/agents/speckit.constitution.agent.md | ✅ Active | 2026-03-25 | 宪章更新流程与一致性校验规则 |
 | Skills Protocol | .specify/templates/instructions/speckit-skills.instructions.md | ✅ Active | 2026-03-25 | 规定技能优先与激活流程 |
-| CLI Reference | docs/reference/iptrace-cli.md | ✅ Active | 2026-03-26 | check/trace/export 契约化命令参考 |
+| CLI Reference | docs/reference/iptrace-cli.md | ✅ Active | 2026-03-27 | check/trace/export 契约化命令参考（含 verbose 模式与 timeout=0 说明） |
 
 ---
 
@@ -138,6 +139,7 @@ Add rows that are relevant; remove or leave empty categories that don't apply.
 
 | Topic | Location | Type | Description |
 |-------|----------|------|-------------|
+| Project README | README.md | Guide | 项目概览、构建步骤、测试命令与常用运行方式 |
 | Governance Rules | .specify/memory/constitution.md | Governance | 核心原则、修订流程与合规要求 |
 | Documentation Index | .specify/memory/system-map.md | Index | 项目文档与组件目录 |
 | Agent Workflow Docs | .github/agents/ | Process | 命令执行策略与约束说明 |

@@ -1,0 +1,29 @@
+# Go
+bin/
+*.exe
+*.test
+*.out
+vendor/
+
+# Build artifacts
+build/
+dist/
+
+# iptrace binary (built at repo root)
+iptrace
+
+# Runtime-generated snapshots
+snapshot.rules
+*.rules
+
+# Logs and env
+*.log
+.env*
+
+# Editors & OS
+.DS_Store
+Thumbs.db
+*.tmp
+*.swp
+.vscode/
+.idea/

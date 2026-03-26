@@ -32,8 +32,9 @@ func TestTraceContract(t *testing.T) {
 		if err != nil {
 			t.Fatalf("expect success, got err=%v, out=%s", err, string(out))
 		}
-		if !strings.Contains(string(out), "PREROUTING") {
-			t.Fatalf("expect trace output, got: %s", string(out))
+		// Brief mode emits one verdict line per packet: mock event → ACCEPT
+		if !strings.Contains(string(out), "ACCEPT") {
+			t.Fatalf("expect ACCEPT in trace output, got: %s", string(out))
 		}
 	})
 }

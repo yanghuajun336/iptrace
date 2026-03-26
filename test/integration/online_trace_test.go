@@ -17,8 +17,9 @@ func TestOnlineTrace_WithMockEvents(t *testing.T) {
 		t.Fatalf("expect success, got err=%v, out=%s", err, string(out))
 	}
 	text := string(out)
-	if !strings.Contains(text, "PREROUTING") {
-		t.Fatalf("expect hook output, got: %s", text)
+	// In brief mode the mock event is rendered as a single ACCEPT verdict line.
+	if !strings.Contains(text, "ACCEPT") {
+		t.Fatalf("expect ACCEPT in trace output, got: %s", text)
 	}
 }
 

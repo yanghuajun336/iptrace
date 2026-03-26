@@ -19,7 +19,7 @@ func TestExportThenCheck(t *testing.T) {
 		t.Fatalf("export failed: err=%v out=%s", err, string(out))
 	}
 
-	checkCmd := exec.Command("go", "run", "./cmd/iptrace", "check", "--src", "1.2.3.4", "--dst", "10.0.0.1", "--proto", "tcp", "--sport", "12345", "--dport", "8080", "--rules-file", outFile)
+	checkCmd := exec.Command("go", "run", "./cmd/iptrace", "check", "--src", "1.2.3.4", "--dst", "10.0.0.1", "--proto", "tcp", "--dport", "8080", "--rules-file", outFile)
 	checkCmd.Dir = root
 	out, err := checkCmd.CombinedOutput()
 	if err != nil {

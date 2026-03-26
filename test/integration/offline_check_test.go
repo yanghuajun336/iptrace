@@ -19,7 +19,7 @@ COMMIT
 		t.Fatalf("write temp rules failed: %v", err)
 	}
 
-	cmd := exec.Command("go", "run", "./cmd/iptrace", "check", "--src", "1.2.3.4", "--dst", "10.0.0.1", "--proto", "tcp", "--sport", "12345", "--dport", "8080", "--rules-file", tmp)
+	cmd := exec.Command("go", "run", "./cmd/iptrace", "check", "--src", "1.2.3.4", "--dst", "10.0.0.1", "--proto", "tcp", "--dport", "8080", "--rules-file", tmp)
 	cmd.Dir = projectRoot(t)
 	out, err := cmd.CombinedOutput()
 	if err != nil {

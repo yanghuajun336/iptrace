@@ -14,9 +14,8 @@ func runCheck(args []string) int {
 	fs := newFlagSet("check")
 	src := fs.String("src", "", "source ip")
 	dst := fs.String("dst", "", "destination ip")
-	proto := fs.String("proto", "", "protocol")
-	sport := fs.Uint("sport", 0, "source port")
-	dport := fs.Uint("dport", 0, "destination port")
+	proto := fs.String("proto", "", "protocol: tcp|udp|icmp")
+	dport := fs.Uint("dport", 0, "destination port (required for tcp/udp)")
 	rulesFile := fs.String("rules-file", "", "rules file path")
 	format := fs.String("format", "human", "output format: human|json")
 	if err := fs.Parse(args); err != nil {
@@ -38,7 +37,6 @@ func runCheck(args []string) int {
 		Protocol: *proto,
 		SrcIP:    *src,
 		DstIP:    *dst,
-		SrcPort:  uint16(*sport),
 		DstPort:  uint16(*dport),
 	}
 	if err := packet.Validate(); err != nil {

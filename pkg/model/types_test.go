@@ -38,6 +38,15 @@ func TestPacketValidate(t *testing.T) {
 			wantErr: true,
 		},
 		{
+			name: "tcp 可不指定源端口 (源端口=0 表示任意)",
+			packet: Packet{
+				Protocol: "tcp",
+				SrcIP:    "1.1.1.1",
+				DstIP:    "2.2.2.2",
+				DstPort:  80,
+			},
+		},
+		{
 			name: "ip 非法",
 			packet: Packet{
 				Protocol: "udp",

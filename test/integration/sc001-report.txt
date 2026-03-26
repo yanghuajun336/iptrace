@@ -1,0 +1,11 @@
+SC-001 Acceptance Report
+Date: 2026-03-26T20:06:19+08:00
+Command: iptrace check --src 1.2.3.4 --dst 10.0.0.1 --proto tcp --sport 12345 --dport 8080 --rules-file test/fixtures/rules/drop_8080.rules
+ElapsedSeconds: 0
+Status: PASS
+Reason: 
+
+Output:
+Backend: iptables-legacy
+Packet:  tcp 1.2.3.4:12345 -> 10.0.0.1:8080
+Verdict: DROP

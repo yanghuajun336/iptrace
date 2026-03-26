@@ -2,7 +2,7 @@
 
 **Feature Branch**: `feat/001-packet-trace`
 **Created**: 2026-03-25
-**Status**: Draft
+**Status**: Implemented
 **Input**: User description: "我想开发一个iptrace - iptables/firewalld 报文调试工具，一个用于Linux系统的调试工具，帮助你精准定位报文被哪条iptables/firewalld规则丢弃，或者被哪条规则放通。支持在线实时抓包分析和事后推演。"
 
 ## Available Skills Analysis
@@ -17,7 +17,7 @@ None applicable
 - 默认支持 IPv4；IPv6（ip6tables）支持作为后续扩展，不在本次规格范围内。
 - "在线实时分析"模式通过内核 Netfilter 追踪机制（如 `xt_trace` 模块或 nftables 追踪）实现；工具不在默认模式下捕获原始流量，而是追踪规则命中路径。
 - "事后推演"模式：用户提供报文描述（五元组）和规则快照文件，工具在本地模拟规则遍历，无需网络实时流量。
-- 工具默认以只读方式运行，不修改防火墙配置。
+- 工具默认以只读方式运行，不修改持久化防火墙配置；`trace` 子命令允许临时注入追踪规则，但 MUST 在会话结束后自动清理并恢复现场。
 - 支持 iptables（legacy 与 nft 后端）和 firewalld（通过其底层 iptables/nftables 规则集）。
 - 诊断结果同时支持人类可读格式和 JSON 结构化输出。
 
@@ -56,7 +56,7 @@ None applicable
 
 **Acceptance Scenarios**:
 
-1. **Given** 系统内核支持追踪模块且用户以 root 身份运行，**When** 用户执行 `iptrace trace --filter "src 1.2.3.4 dport 80"` 并有符合条件的报文到达，**Then** 工具实时输出：到达时间戳、钩子点名称（PREROUTING/INPUT/FORWARD/OUTPUT/POSTROUTING）、命中规则（表/链/规则序号/规则内容）、每步决策；最终输出完整路径摘要。
+1. **Given** 系统内核支持追踪模块且用户以 root 身份运行，**When** 用户执行 `iptrace trace --src 1.2.3.4 --proto tcp --dport 80` 并有符合条件的报文到达，**Then** 工具以**简洁模式**（默认）输出每报文一行（时间戳、最终判决、命中规则）；加 `--verbose`/`-v` 则输出完整钩子点遍历路径，相邻报文以 `══ Packet #N id=0x... ══` 边界清晰分隔。
 2. **Given** 内核不支持所需追踪机制，**When** 用户执行追踪命令，**Then** 工具以非零退出码失败，错误信息说明缺少哪个内核模块/能力，并提供修复建议（如加载 `xt_LOG` 或 `nf_log` 模块）。
 3. **Given** 用户以非 root 身份运行，**When** 用户执行在线追踪命令，**Then** 工具立即退出并提示权限不足，建议使用 `sudo`。
 
@@ -75,7 +75,7 @@ None applicable
 **Acceptance Scenarios**:
 
 1. **Given** 用户以 root 身份在有效的 iptables 规则环境下运行，**When** 用户执行 `iptrace export --output snapshot.rules`，**Then** 工具输出规则快照文件，文件格式可被 `iptrace check --rules-file` 直接使用，退出码为 0。
-2. **Given** 用户已完成一次离线推演，**When** 用户追加 `--report json` 参数，**Then** 工具以 JSON 格式输出包含五元组、命中规则、决策结果的结构化报告，字段定义与人类可读格式语义一致。
+2. **Given** 用户已完成一次离线推演，**When** 用户追加 `--format json` 参数，**Then** 工具以 JSON 格式输出包含五元组、命中规则、决策结果的结构化报告，字段定义与人类可读格式语义一致。
 3. **Given** 用户在 firewalld 管理的系统上运行导出命令，**When** 执行 `iptrace export`，**Then** 工具识别 firewalld 并通过其底层规则集导出完整快照，输出注明规则管理来源（firewalld）。
 
 ---
@@ -93,13 +93,13 @@ None applicable
 
 ### Functional Requirements
 
-- **FR-001**: 系统 MUST 接受报文五元组（源 IP、目标 IP、源端口、目标端口、协议）作为追踪输入参数。
+- **FR-001**: 系统 MUST 接受报文五元组（源 IP、目标 IP、目标端口、协议）为必填输入参数；源端口为可选参数，省略时视为匹配任意源端口。
 - **FR-002**: 系统 MUST 在离线推演模式下，基于用户提供的规则快照文件模拟报文经过各 Netfilter 表/链的遍历过程。
 - **FR-003**: 系统 MUST 在推演结束后输出最终决策结果（ACCEPT、DROP 或 REJECT），并明确指出命中的规则（表名、链名、规则序号、原始规则内容）。
 - **FR-004**: 系统 MUST 在在线追踪模式下，利用系统内核追踪能力捕获真实报文经过 Netfilter 各钩子点的路径，并实时输出每步决策。
 - **FR-005**: 系统 MUST 支持从当前系统导出 iptables/firewalld 规则快照，导出格式可直接用于离线推演。
 - **FR-006**: 系统 MUST 同时支持人类可读格式输出（默认）和 JSON 结构化输出（通过参数切换），两种格式字段语义一致。
-- **FR-007**: 系统 MUST 在默认模式下为只读操作，不修改任何防火墙配置。
+- **FR-007**: 系统 MUST 在默认模式下为只读操作，不修改任何持久化防火墙配置；`trace` 模式若注入临时追踪规则，MUST 在退出时自动清理。
 - **FR-008**: 系统 MUST 在环境不满足前置条件时（如缺少内核模块、权限不足、文件不存在）以非零退出码失败，并输出可执行的修复建议。
 - **FR-009**: 系统 MUST 正确处理自定义链跳转（JUMP/RETURN），在输出中呈现完整的链遍历路径，包括链名、跳转原因和 RETURN 返回路径。
 - **FR-010**: 系统 MUST 同时识别并支持 iptables-legacy、iptables-nft 两种后端以及 firewalld 管理的规则环境，并在输出中注明检测到的后端类型。

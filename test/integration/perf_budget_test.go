@@ -72,7 +72,7 @@ func TestTrace_MemoryBudget(t *testing.T) {
 	var before runtime.MemStats
 	runtime.ReadMemStats(&before)
 
-	session := tracer.NewSession(tracer.SessionOptions{})
+	session := tracer.NewSession(tracer.SessionOptions{TestMode: true})
 	ctx, cancel := context.WithTimeout(context.Background(), 1500*time.Millisecond)
 	defer cancel()
 

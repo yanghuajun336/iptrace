@@ -121,6 +121,9 @@
 - [x] T042 [P] [Skill: speckit-developer] 重构重复逻辑并清理技术债 `internal/{parser,matcher,tracer,exporter}/`
 - [x] T043 [Skill: speckit-developer] 完成 quickstart 冒烟验证 `specs/001-packet-trace/quickstart.md`（逐命令执行核对）
 - [x] T044 [Skill: speckit-developer] 执行全量测试并记录结果 `go test ./...`（输出保存至 `test/integration/test-report.txt`）
+- [x] T045 [Skill: speckit-developer] 补充 SC-001 可执行验收脚本与报告 `test/integration/{sc001_acceptance.sh,sc001-report.txt}`
+- [x] T046 [Skill: speckit-developer] 补充 SC-007 长时性能验收脚本与报告模板 `test/integration/{sc007_longrun.sh,sc007-report.md}`
+- [x] T047 [Skill: speckit-developer] 扩展离线推演引擎 `internal/matcher/simulate.go`：多表遍历（raw/mangle/nat/filter）、多链（PREROUTING/INPUT/FORWARD/OUTPUT/POSTROUTING）、自定义链 JUMP/RETURN 递归、CIDR 匹配（之前仅支持 filter/INPUT 精确 IP）
 
 <!-- CONVERGENCE_BOUNDARY -->
 
@@ -136,6 +139,13 @@
 - [x] TN06 [Skill: speckit-librarian] 更新系统地图 `.specify/memory/system-map.md`（新增永久文档条目，更新时间戳，状态改为 ✅）
 - [x] TN07 [Skill: speckit-librarian] 扫描并清理系统地图中所有 `specs/` 引用（若存在先蒸馏再替换）
 - [x] TN08 [Skill: speckit-librarian] 验证任务与测试一一对应并记录于 `docs/quality/tdd-traceability.md`
+- [x] TN09 [Skill: speckit-librarian] 更新 CLI 参考文档 `docs/reference/iptrace-cli.md`：`trace` 新增 `--verbose/-v` 标志、`--timeout` 默认改为 `0`（无超时）；`check` 删除 `--sport` 参数
+- [x] TN10 [Skill: speckit-librarian] 更新 `docs/quality/tdd-traceability.md`：新增 T048~T052 UX 改进任务的测试—实现映射（去 sport、timeout=0、verbose 输出、TraceID 分组）
+- [x] TN11 [Skill: speckit-librarian] 更新 `specs/001-packet-trace/spec.md`：修订 FR-001（源端口非必须）、US1/US2 验收场景示例命令去掉 `--sport`
+- [x] TN12 [Skill: speckit-librarian] 更新 `README.md`：`check` 示例去 `--sport`，`trace` 增加 verbose 与无超时说明
+- [x] TN13 [Skill: speckit-librarian] 同步 `.specify/memory/system-map.md`：更新 CLI 参考和 TDD Traceability 的 Last Updated 时间戳
+- [x] TN14 [Skill: speckit-librarian] 更新 `docs/quality/tdd-traceability.md`：新增 T053~T055 规则文本显示与五元组解析任务的测试—实现映射
+- [x] TN15 [Skill: speckit-librarian] 更新 `docs/reference/iptrace-cli.md` 与 `.specify/memory/system-map.md`：反映 verbose header 五元组显示与 brief 模式规则文本输出
 
 ---
 

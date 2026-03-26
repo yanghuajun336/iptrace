@@ -27,14 +27,14 @@ subcommand:
 常用参数：
 
 - `--src`、`--dst`、`--proto`
-- `--sport`、`--dport`（tcp/udp 场景需要）
+- `--dport`（tcp/udp 场景必须；源端口可选，不指定则视为任意源端口）
 - `--rules-file`
 - `--format human|json`
 
 示例：
 
 ```bash
-iptrace check --src 1.2.3.4 --dst 10.0.0.1 --proto tcp --sport 12345 --dport 8080 --rules-file snapshot.rules
+iptrace check --src 1.2.3.4 --dst 10.0.0.1 --proto tcp --dport 8080 --rules-file snapshot.rules
 ```
 
 ---
@@ -46,10 +46,16 @@ iptrace check --src 1.2.3.4 --dst 10.0.0.1 --proto tcp --sport 12345 --dport 808
 常用参数：
 
 - `--src`、`--dst`、`--proto`、`--sport`、`--dport`
-- `--timeout`
+- `--timeout`（默认 `0`，永不超时；按 Ctrl+C 停止）
+- `--verbose` / `-v`（详细模式：输出每报文完整路径块，含 `══ Packet #N ══` 边框；默认简洁模式：每报文仅输出最终判决一行）
 - `--format human|json`
 
-说明：
+输出模式说明：
+
+- **简洁模式**（默认）：每报文一行，格式 `[HH:MM:SS.mmm] <verdict>  <table/chain>  rule#<n>`，聚焦到实际判决点；DROP/REJECT 时追加一行 `  └─ <nft 规则原文>`。
+- **详细模式**（`-v`）：每报文以 `══ Packet #N  id=0x...  src:port → dst:port proto ══` 为头、`────` 为尾包围完整路径，判决行以 `▶` 标记，命中规则下方同样追加 `      └─ <nft 规则原文>`。
+
+其他说明：
 
 - 默认需要 root/CAP_NET_ADMIN；
 - 支持测试模式环境变量 `IPTRACE_TEST_MODE=1` 用于受控验证。
@@ -57,7 +63,14 @@ iptrace check --src 1.2.3.4 --dst 10.0.0.1 --proto tcp --sport 12345 --dport 808
 示例：
 
 ```bash
+# 简洁模式（默认，Ctrl+C 停止）
 sudo iptrace trace --src 1.2.3.4 --proto tcp --dport 80
+
+# 详细模式，含完整路径
+sudo iptrace trace --src 1.2.3.4 --proto tcp --dport 80 --verbose
+
+# 30 秒超时
+sudo iptrace trace --src 1.2.3.4 --proto tcp --dport 80 --timeout 30s
 ```
 
 ---

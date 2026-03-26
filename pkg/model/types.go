@@ -48,6 +48,14 @@ type Rule struct {
 }
 
 type TraceStep struct {
+	TraceID    uint32 `json:"trace_id,omitempty"` // per-packet unique ID; steps with the same ID belong to the same packet traversal
+	// Packet 5-tuple (populated from the NFT network/transport header attrs)
+	PktSrcIP   string `json:"pkt_src_ip,omitempty"`
+	PktDstIP   string `json:"pkt_dst_ip,omitempty"`
+	PktProto   string `json:"pkt_proto,omitempty"`
+	PktSrcPort uint16 `json:"pkt_src_port,omitempty"`
+	PktDstPort uint16 `json:"pkt_dst_port,omitempty"`
+	// Traversal info
 	HookPoint  string `json:"hook_point"`
 	Table      string `json:"table"`
 	Chain      string `json:"chain"`
@@ -83,8 +91,8 @@ func (p Packet) Validate() error {
 	}
 
 	if p.Protocol == "tcp" || p.Protocol == "udp" {
-		if p.SrcPort == 0 || p.DstPort == 0 {
-			return fmt.Errorf("src/dst port are required for %s", p.Protocol)
+		if p.DstPort == 0 {
+			return fmt.Errorf("dst port is required for %s", p.Protocol)
 		}
 	}
 
