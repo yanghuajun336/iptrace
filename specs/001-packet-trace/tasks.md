@@ -128,14 +128,14 @@
 
 **Purpose**: 将 `specs/` 临时知识蒸馏到长期文档并同步系统地图
 
-- [ ] TN01 [Skill: speckit-librarian] 创建 ADR `docs/adr/0001-trace-mechanism.md`（基于 `research.md` 的追踪机制决策）
-- [ ] TN02 [Skill: speckit-librarian] 创建 ADR `docs/adr/0002-language-and-dependency-policy.md`（Go 主实现与最小依赖策略）
-- [ ] TN03 [Skill: speckit-librarian] 创建架构总览 `docs/architecture/iptrace-overview.md`（蒸馏 `specs/001-packet-trace/{c4,uml}/`）
-- [ ] TN04 [Skill: speckit-librarian] 创建 CLI 参考文档 `docs/reference/iptrace-cli.md`（蒸馏 `specs/001-packet-trace/contracts/README.md`）
-- [ ] TN05 [Skill: speckit-librarian] 创建性能基线文档 `docs/performance/iptrace-baseline.md`
-- [ ] TN06 [Skill: speckit-librarian] 更新系统地图 `.specify/memory/system-map.md`（新增永久文档条目，更新时间戳，状态改为 ✅）
-- [ ] TN07 [Skill: speckit-librarian] 扫描并清理系统地图中所有 `specs/` 引用（若存在先蒸馏再替换）
-- [ ] TN08 [Skill: speckit-librarian] 验证任务与测试一一对应并记录于 `docs/quality/tdd-traceability.md`
+- [x] TN01 [Skill: speckit-librarian] 创建 ADR `docs/adr/0001-trace-mechanism.md`（基于 `research.md` 的追踪机制决策）
+- [x] TN02 [Skill: speckit-librarian] 创建 ADR `docs/adr/0002-language-and-dependency-policy.md`（Go 主实现与最小依赖策略）
+- [x] TN03 [Skill: speckit-librarian] 创建架构总览 `docs/architecture/iptrace-overview.md`（蒸馏 `specs/001-packet-trace/{c4,uml}/`）
+- [x] TN04 [Skill: speckit-librarian] 创建 CLI 参考文档 `docs/reference/iptrace-cli.md`（蒸馏 `specs/001-packet-trace/contracts/README.md`）
+- [x] TN05 [Skill: speckit-librarian] 创建性能基线文档 `docs/performance/iptrace-baseline.md`
+- [x] TN06 [Skill: speckit-librarian] 更新系统地图 `.specify/memory/system-map.md`（新增永久文档条目，更新时间戳，状态改为 ✅）
+- [x] TN07 [Skill: speckit-librarian] 扫描并清理系统地图中所有 `specs/` 引用（若存在先蒸馏再替换）
+- [x] TN08 [Skill: speckit-librarian] 验证任务与测试一一对应并记录于 `docs/quality/tdd-traceability.md`
 
 ---
 
