@@ -3,20 +3,23 @@
 **Purpose**: Centralized index of all authoritative documentation for the project. Enables AI agents to quickly locate relevant context without scanning the entire codebase.
 
 **Template Version**: 2.0.0
-**Version**: [SYSTEM_MAP_VERSION] | **Created**: [CREATION_DATE] | **Last Updated**: [DATE]
-**Maintained By**: [Team/Owner]
+**Version**: 1.0.0 | **Created**: 2026-03-25 | **Last Updated**: 2026-03-26
+**Maintained By**: iptrace Maintainers
 **Review Frequency**: After each major feature completion
 
 ---
 
 ## Project Identity
 
-**Project**: [PROJECT_NAME]
-**Description**: [PROJECT_DESCRIPTION]
+**Project**: iptrace
+**Description**: Linux 报文调试工具，用于定位报文被哪条 iptables/firewalld 规则丢弃或放通，支持实时分析与事后推演。
 
 ### Core Principles
 
-<!-- Populated from constitution. List key principles as numbered items. -->
+1. 代码质量优先：主干代码必须通过质量门禁并可维护。
+2. 用户体验一致性：CLI 交互、输出语义、错误码与提示保持一致。
+3. 性能预算与可验证目标：改动必须声明并验证性能预算。
+4. Test-First Testing Standard：先写失败测试，再实现并回归验证。
 
 ### Technology Stack
 
@@ -24,6 +27,10 @@
 
 | Category | Technology | Purpose |
 |----------|-----------|---------|
+| Platform | Linux + Netfilter (iptables/firewalld) | 报文过滤链路与规则判定基础 |
+| Scripting | Bash | 规范化流程与自动化脚本 |
+| Tooling | Python 3 | 技能解析与流程支持脚本 |
+| Documentation | Markdown | 规范、流程和项目记忆沉淀 |
 
 ### Project Components
 
@@ -31,6 +38,12 @@
 
 | Component | Location | Technology | Purpose |
 |-----------|----------|------------|---------|
+| Memory Center | .specify/memory/ | Markdown | 保存宪章与系统地图 |
+| Template Set | .specify/templates/ | Markdown | 定义 spec/plan/tasks/system-map 模板 |
+| Automation Scripts | .specify/scripts/ | Bash/Python | 特性创建、计划初始化与上下文更新 |
+| Agent Definitions | .github/agents/ | Markdown | 各 Speckit 命令的执行规则 |
+| Prompt Definitions | .github/prompts/ | Markdown | 命令入口与提示路由 |
+| Skill Library | .github/skills/ | Markdown/YAML | 领域技能与适配器规范 |
 
 ---
 
@@ -55,16 +68,26 @@ Add rows that are relevant; remove or leave empty categories that don't apply.
 
 | Artifact | Location | Status | Last Updated | Description |
 |----------|----------|--------|--------------|-------------|
+| Project Constitution | .specify/memory/constitution.md | ✅ Active | 2026-03-25 | 项目治理原则、质量标准与性能约束 |
+| Architecture Overview | docs/architecture/iptrace-overview.md | ✅ Active | 2026-03-26 | iptrace 组件边界、关键流程与演进路线 |
+| Trace Mechanism ADR | docs/adr/0001-trace-mechanism.md | ✅ Active | 2026-03-26 | 在线追踪机制选型与后续补充策略 |
+| Language & Dependency ADR | docs/adr/0002-language-and-dependency-policy.md | ✅ Active | 2026-03-26 | Go 主实现与最小依赖治理策略 |
 
 ### 📐 Configuration & Infrastructure
 
 | Artifact | Location | Status | Last Updated | Description |
 |----------|----------|--------|--------------|-------------|
+| Speckit Config | .speckit.yaml | ✅ Active | 2026-03-25 | 技能扫描目录与项目记忆路径配置 |
+| Workspace Settings | .vscode/settings.json | ✅ Active | 2026-03-25 | 编辑器行为与工作区配置 |
 
 ### 🧪 Quality & Testing
 
 | Artifact | Location | Status | Last Updated | Description |
 |----------|----------|--------|--------------|-------------|
+| Tasks Template | .specify/templates/tasks-template.md | ✅ Active | 2026-03-25 | 定义测试先行、阶段执行与收敛验证模式 |
+| Plan Template | .specify/templates/plan-template.md | ✅ Active | 2026-03-25 | 包含 Constitution Check 与技术上下文门禁 |
+| Performance Baseline | docs/performance/iptrace-baseline.md | ✅ Active | 2026-03-26 | 收敛后的性能预算与验证基线 |
+| TDD Traceability | docs/quality/tdd-traceability.md | ✅ Active | 2026-03-26 | 任务—测试—实现可追溯矩阵 |
 
 ### 🧭 Project Memory
 
@@ -76,13 +99,16 @@ Add rows that are relevant; remove or leave empty categories that don't apply.
 
 | Artifact | Location | Status | Last Updated | Description |
 |----------|----------|--------|--------------|-------------|
-| System Map | `.specify/memory/system-map.md` | ✅ Active | [DATE] | Living index of all project components and documentation |
-| Project Constitution | `.specify/memory/constitution.md` | ✅ Active | [DATE] | Governing principles and architectural constraints |
+| System Map | `.specify/memory/system-map.md` | ✅ Active | 2026-03-26 | Living index of all project components and documentation |
+| Project Constitution | `.specify/memory/constitution.md` | ✅ Active | 2026-03-25 | Governing principles and architectural constraints |
 
 ### 📚 Decisions & Standards
 
 | Artifact | Location | Status | Last Updated | Description |
 |----------|----------|--------|--------------|-------------|
+| Constitution Agent Guide | .github/agents/speckit.constitution.agent.md | ✅ Active | 2026-03-25 | 宪章更新流程与一致性校验规则 |
+| Skills Protocol | .specify/templates/instructions/speckit-skills.instructions.md | ✅ Active | 2026-03-25 | 规定技能优先与激活流程 |
+| CLI Reference | docs/reference/iptrace-cli.md | ✅ Active | 2026-03-26 | check/trace/export 契约化命令参考 |
 
 ---
 
@@ -112,6 +138,10 @@ Add rows that are relevant; remove or leave empty categories that don't apply.
 
 | Topic | Location | Type | Description |
 |-------|----------|------|-------------|
+| Governance Rules | .specify/memory/constitution.md | Governance | 核心原则、修订流程与合规要求 |
+| Documentation Index | .specify/memory/system-map.md | Index | 项目文档与组件目录 |
+| Agent Workflow Docs | .github/agents/ | Process | 命令执行策略与约束说明 |
+| Prompt Catalog | .github/prompts/ | Process | 代理触发入口与提示配置 |
 
 ### Technical Context
 
@@ -119,6 +149,7 @@ Add rows that are relevant; remove or leave empty categories that don't apply.
 
 | Domain | Resource | Description |
 |--------|----------|-------------|
+| Project Automation | .specify/scripts/ | 特性脚手架、环境检查与上下文更新脚本 |
 
 ---
 
