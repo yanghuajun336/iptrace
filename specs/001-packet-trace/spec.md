@@ -56,7 +56,7 @@ None applicable
 
 **Acceptance Scenarios**:
 
-1. **Given** 系统内核支持追踪模块且用户以 root 身份运行，**When** 用户执行 `iptrace trace --src 1.2.3.4 --proto tcp --dport 80` 并有符合条件的报文到达，**Then** 工具以**简洁模式**（默认）输出每报文一行（时间戳、最终判决、命中规则）；加 `--verbose`/`-v` 则输出完整钩子点遍历路径，相邻报文以 `══ Packet #N id=0x... ══` 边界清晰分隔。
+1. **Given** 系统内核支持追踪模块且用户以 root 身份运行，**When** 用户执行 `iptrace trace --src 1.2.3.4 --proto tcp --dport 80` 并有符合条件的报文到达，**Then** 工具以**简洁模式**（默认）输出每报文一行（时间戳、最终判决、命中规则），DROP/REJECT 时追加一行 `└─ <nft 规则原文>`；加 `--verbose`/`-v` 则输出完整钩子点遍历路径，每报文以 `══ Packet #N  id=0x...  src:port → dst:port proto ══` 为头、`──────` 为尾，相邻报文边界清晰。
 2. **Given** 内核不支持所需追踪机制，**When** 用户执行追踪命令，**Then** 工具以非零退出码失败，错误信息说明缺少哪个内核模块/能力，并提供修复建议（如加载 `xt_LOG` 或 `nf_log` 模块）。
 3. **Given** 用户以非 root 身份运行，**When** 用户执行在线追踪命令，**Then** 工具立即退出并提示权限不足，建议使用 `sudo`。
 
@@ -86,8 +86,8 @@ None applicable
 - 报文五元组匹配到含有 `RETURN` 目标的规则时，工具需继续追踪父链处理逻辑，直到最终决策，不得误报 RETURN 为最终结果。
 - 规则快照包含自定义链（user-defined chain）时，工具需递归追踪，正确呈现完整跳转路径。
 - 若默认链策略为 ACCEPT 且所有规则均不匹配，工具需明确输出"默认策略 ACCEPT"而非空结果或静默通过。
-- 在线追踪模式下，若追踪输出流量过大（高速网络环境），工具需支持流量限速或采样，避免输出淹没终端，且不影响系统稳定性。
-- 涉及 NAT 规则（PREROUTING DNAT / POSTROUTING SNAT）时，工具需呈现 NAT 转换前后的地址变化，避免用户因地址变换误判规则未命中。
+- **[Future Scope]** 在线追踪模式下，若追踪输出流量过大（高速网络环境），工具需支持流量限速或采样，避免输出淹没终端，且不影响系统稳定性。当前版本无此实现，待后续迭代补充。
+- **[Future Scope]** 涉及 NAT 规则（PREROUTING DNAT / POSTROUTING SNAT）时，工具需呈现 NAT 转换前后的地址变化，避免用户因地址变换误判规则未命中。当前版本 `TraceStep` 仅携带内核上报的报文原始地址，NAT 前后地址对比展示待后续迭代补充。
 
 ## Requirements *(mandatory)*
 
@@ -109,7 +109,7 @@ None applicable
 
 - **Packet（报文描述）**: 一次追踪的输入对象，由五元组（协议、源IP、目标IP、源端口、目标端口）加上可选的入口网卡（ingress interface）构成；无状态，不携带实际载荷。
 - **RuleSet（规则集快照）**: 特定时刻系统防火墙规则的完整镜像，包含表（table）、链（chain）、默认策略和规则列表；可来自实时导出或文件加载。
-- **TraceStep（追踪步骤）**: 报文在一个具体规则上的匹配事件，包含：钩子点名称、表名、链名、规则序号、规则内容、匹配结果（命中/未命中）、产生的动作（目标）。
+- **TraceStep（追踪步骤）**: 报文在一个具体规则上的匹配事件，包含：`TraceID`（per-packet 唯一 ID，用于将多个步骤归属同一报文）、报文五元组（`PktSrcIP`/`PktDstIP`/`PktProto`/`PktSrcPort`/`PktDstPort`，由内核 IP/传输层 header 解析得出）、钩子点名称、表名、链名、规则序号、nft 规则原文（`RawRule`，来自 `nft --handle list ruleset` 查找）、匹配结果（命中/未命中）、产生的动作（目标）。
 - **TraceResult（追踪结果）**: 完整的推演/追踪输出，由有序的 TraceStep 序列和最终判决（ACCEPT/DROP/REJECT + 依据）组成。
 - **Backend（规则后端）**: 检测到的规则管理层，取值为 iptables-legacy、iptables-nft 或 firewalld，决定规则读取与解析方式。
 

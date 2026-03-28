@@ -71,5 +71,7 @@
 | T053 | 实现 | 新建 `internal/tracer/rulecache.go`：启动时执行 `nft --handle list ruleset`，按 `table/chain/handle` 建索引，供 verbose 模式查找规则原文 | `internal/tracer/rulecache.go` / `cmd/iptrace/trace.go` |
 | T054 | 实现 | `nfttrace.go` 解析 `NFTA_TRACE_NETWORK_HEADER`（IPv4 头）与 `NFTA_TRACE_TRANSPORT_HEADER`（TCP/UDP 头），填充 `TraceStep.PktSrcIP/DstIP/Proto/SrcPort/DstPort` | `internal/tracer/nfttrace.go` / `pkg/model/types.go` |
 | T055 | 实现 | `stream.go` 更新：`RenderBriefPacket` 在 DROP/REJECT 行后追加 `└─ <rule>` 规则原文；`RenderVerbosePacket` header 行显示五元组 `src:port → dst:port proto` | `internal/output/stream.go` |
+| T056 | 单元测试 | `internal/tracer/rulecache_test.go`：验证 `BuildRuleCache` 正确解析 nft 输出建立 handle 索引；nft 不可用时返回空 cache（graceful degradation） | `internal/tracer/rulecache_test.go` |
+| T057 | 单元测试 | `internal/tracer/nfttrace_test.go`：验证 `nftParsePacketHeaders` 从模拟 IP/TCP/UDP header bytes 正确提取五元组 | `internal/tracer/nfttrace_test.go` |
 
 **验证状态**: `go test ./...` 全 10 包通过（含上述变更）。

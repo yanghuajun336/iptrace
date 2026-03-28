@@ -146,6 +146,8 @@
 - [x] TN13 [Skill: speckit-librarian] 同步 `.specify/memory/system-map.md`：更新 CLI 参考和 TDD Traceability 的 Last Updated 时间戳
 - [x] TN14 [Skill: speckit-librarian] 更新 `docs/quality/tdd-traceability.md`：新增 T053~T055 规则文本显示与五元组解析任务的测试—实现映射
 - [x] TN15 [Skill: speckit-librarian] 更新 `docs/reference/iptrace-cli.md` 与 `.specify/memory/system-map.md`：反映 verbose header 五元组显示与 brief 模式规则文本输出
+- [x] T056 [US2] [Skill: speckit-developer] 编写 `internal/tracer/rulecache_test.go`：验证 `BuildRuleCache` 解析 `nft --handle list ruleset` 输出正确建立 table/chain/handle 索引；nft 不可用时返回空 cache（graceful degradation）
+- [x] T057 [US2] [Skill: speckit-developer] 补充 `internal/tracer/nfttrace_test.go`（或现有 `nflog_decode_test.go`）：验证 `nftParsePacketHeaders` 从模拟 `NFTA_TRACE_NETWORK_HEADER` + `NFTA_TRACE_TRANSPORT_HEADER` 正确提取 src/dst IP、proto、src/dst port；IPv4 + TCP/UDP 两种协议均覆盖
 
 ---
 

@@ -27,8 +27,7 @@
 
 | Category | Technology | Purpose |
 |----------|-----------|---------|
-| Platform | Linux + Netfilter (iptables/firewalld) | 报文过滤链路与规则判定基础 |
-| Scripting | Bash | 规范化流程与自动化脚本 |
+| Language | Go 1.21+ | CLI 主实现；依赖 stdlib + golang.org/x/sys/unix（netlink） |
 | Tooling | Python 3 | 技能解析与流程支持脚本 |
 | Documentation | Markdown | 规范、流程和项目记忆沉淀 |
 
