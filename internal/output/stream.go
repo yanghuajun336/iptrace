@@ -66,61 +66,64 @@ func RenderBriefPacket(steps []model.TraceStep) string {
 //	INPUT             filter/INPUT                rule#85    DROP
 //	  |__ -A INPUT -p tcp -m tcp --dport 80 -j DROP
 func RenderVerbosePacket(steps []model.TraceStep, pktNum int, traceID uint32) string {
-	var b strings.Builder
+       var b strings.Builder
 
-	// Header: ID + 5-tuple
-	idStr := ""
-	if traceID != 0 {
-		idStr = fmt.Sprintf("  id=0x%08x", traceID)
-	}
-	tupleStr := ""
-	for _, s := range steps {
-		if s.PktSrcIP != "" && s.PktDstIP != "" {
-			if s.PktProto == "tcp" || s.PktProto == "udp" {
-				tupleStr = fmt.Sprintf("  %s:%d → %s:%d %s",
-					s.PktSrcIP, s.PktSrcPort, s.PktDstIP, s.PktDstPort, s.PktProto)
-			} else if s.PktProto != "" {
-				tupleStr = fmt.Sprintf("  %s → %s  %s", s.PktSrcIP, s.PktDstIP, s.PktProto)
-			} else {
-				tupleStr = fmt.Sprintf("  %s → %s", s.PktSrcIP, s.PktDstIP)
-			}
-			break
-		}
-	}
-	fmt.Fprintf(&b, "─── Packet #%d%s%s\n", pktNum, idStr, tupleStr)
+       // Header: ID + 5-tuple
+       idStr := ""
+       if traceID != 0 {
+	       idStr = fmt.Sprintf("  id=0x%08x", traceID)
+       }
+       tupleStr := ""
+       for _, s := range steps {
+	       if s.PktSrcIP != "" && s.PktDstIP != "" {
+		       if s.PktProto == "tcp" || s.PktProto == "udp" {
+			       tupleStr = fmt.Sprintf("  %s:%d → %s:%d %s",
+				       s.PktSrcIP, s.PktSrcPort, s.PktDstIP, s.PktDstPort, s.PktProto)
+		       } else if s.PktProto != "" {
+			       tupleStr = fmt.Sprintf("  %s → %s  %s", s.PktSrcIP, s.PktDstIP, s.PktProto)
+		       } else {
+			       tupleStr = fmt.Sprintf("  %s → %s", s.PktSrcIP, s.PktDstIP)
+		       }
+		       break
+	       }
+       }
+       // 分隔线
+       fmt.Fprintf(&b, "\n%s\n", strings.Repeat("─", 72))
+       fmt.Fprintf(&b, "─── Packet #%d%s%s\n", pktNum, idStr, tupleStr)
 
-	// Group by chain in first-seen order to avoid repeating the same chain name.
-	type chainGroup struct {
-		hookPoint string
-		tableChain string
-		steps []model.TraceStep
-	}
-	groups := make([]chainGroup, 0, len(steps))
-	indexByKey := make(map[string]int)
-	for _, s := range steps {
-		key := s.HookPoint + "|" + s.Table + "/" + s.Chain
-		idx, ok := indexByKey[key]
-		if !ok {
-			groups = append(groups, chainGroup{
-				hookPoint: s.HookPoint,
-				tableChain: fmt.Sprintf("%s/%s", s.Table, s.Chain),
-				steps: []model.TraceStep{s},
-			})
-			indexByKey[key] = len(groups) - 1
-			continue
-		}
-		groups[idx].steps = append(groups[idx].steps, s)
-	}
+       // 1. 按链分组，只保留每组最后一个 step
+       type chainKey struct {
+	       hookPoint string
+	       table     string
+	       chain     string
+       }
+       lastStepByChain := make(map[chainKey]model.TraceStep)
+       chainOrder := make([]chainKey, 0, len(steps))
+       seen := make(map[chainKey]bool)
+       for _, s := range steps {
+	       key := chainKey{s.HookPoint, s.Table, s.Chain}
+	       lastStepByChain[key] = s
+	       if !seen[key] {
+		       chainOrder = append(chainOrder, key)
+		       seen[key] = true
+	       }
+       }
 
-	for _, group := range groups {
-		fmt.Fprintf(&b, "%-18s  %s\n", group.hookPoint, group.tableChain)
-		for _, s := range group.steps {
-			fmt.Fprintf(&b, "  |__ rule#%-6d %s\n", s.RuleNumber, s.Action)
-			if s.RawRule != "" {
-				fmt.Fprintf(&b, "      %s\n", s.RawRule)
-			}
-		}
-	}
+       // 2. 逐链输出：链头+verdict，链下只显示最后命中的那条（如果有 RawRule）
+       for _, key := range chainOrder {
+	       s := lastStepByChain[key]
+	       verdict := s.Action
+	       if s.Action == "JUMP" && s.JumpTarget != "" {
+		       verdict = "JUMP:" + s.JumpTarget
+	       }
+	       fmt.Fprintf(&b, "%-18s  %s  %s\n", key.hookPoint, key.table+"/"+key.chain, verdict)
+	       if s.RuleNumber > 0 {
+		       fmt.Fprintf(&b, "  |__ rule#%-6d %s\n", s.RuleNumber, s.Action)
+		       if s.RawRule != "" {
+			       fmt.Fprintf(&b, "      %s\n", s.RawRule)
+		       }
+	       }
+       }
 
-	return b.String()
+       return b.String()
 }
