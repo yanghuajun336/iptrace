@@ -4,6 +4,8 @@ import (
 	"fmt"
 	"os/exec"
 	"strings"
+
+	"iptrace/pkg/model"
 )
 
 // TraceFilter specifies optional packet-matching criteria to scope a TRACE rule.
@@ -70,6 +72,43 @@ func buildMatchArgs(f TraceFilter) []string {
 		}
 	}
 	return args
+}
+
+// FilterDisplaySteps removes trace-session housekeeping steps that should not be
+// shown to the user, namely the program-injected raw table TRACE rules.
+func FilterDisplaySteps(steps []model.TraceStep, filter TraceFilter) []model.TraceStep {
+	if len(steps) == 0 {
+		return nil
+	}
+	filtered := make([]model.TraceStep, 0, len(steps))
+	for _, step := range steps {
+		if isInjectedTraceStep(step, filter) {
+			continue
+		}
+		filtered = append(filtered, step)
+	}
+	return filtered
+}
+
+func isInjectedTraceStep(step model.TraceStep, filter TraceFilter) bool {
+	if step.Table != "raw" {
+		return false
+	}
+	if step.Chain != "PREROUTING" && step.Chain != "OUTPUT" {
+		return false
+	}
+	if step.RawRule == "" {
+		return false
+	}
+	want := injectedTraceRuleText(step.Chain, filter)
+	return strings.TrimSpace(step.RawRule) == want
+}
+
+func injectedTraceRuleText(chain string, filter TraceFilter) string {
+	parts := []string{"-A", chain}
+	parts = append(parts, buildMatchArgs(filter)...)
+	parts = append(parts, "-j", "TRACE")
+	return strings.Join(parts, " ")
 }
 
 // runIPTables executes an iptables command, trying iptables then iptables-legacy.

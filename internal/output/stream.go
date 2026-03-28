@@ -89,13 +89,36 @@ func RenderVerbosePacket(steps []model.TraceStep, pktNum int, traceID uint32) st
 	}
 	fmt.Fprintf(&b, "─── Packet #%d%s%s\n", pktNum, idStr, tupleStr)
 
-	// One row per step; rule annotation on the next line if available.
+	// Group by chain in first-seen order to avoid repeating the same chain name.
+	type chainGroup struct {
+		hookPoint string
+		tableChain string
+		steps []model.TraceStep
+	}
+	groups := make([]chainGroup, 0, len(steps))
+	indexByKey := make(map[string]int)
 	for _, s := range steps {
-		tableChain := fmt.Sprintf("%s/%s", s.Table, s.Chain)
-		fmt.Fprintf(&b, "%-18s  %-28s  rule#%-6d %s\n",
-			s.HookPoint, tableChain, s.RuleNumber, s.Action)
-		if s.RawRule != "" {
-			fmt.Fprintf(&b, "  |__ %s\n", s.RawRule)
+		key := s.HookPoint + "|" + s.Table + "/" + s.Chain
+		idx, ok := indexByKey[key]
+		if !ok {
+			groups = append(groups, chainGroup{
+				hookPoint: s.HookPoint,
+				tableChain: fmt.Sprintf("%s/%s", s.Table, s.Chain),
+				steps: []model.TraceStep{s},
+			})
+			indexByKey[key] = len(groups) - 1
+			continue
+		}
+		groups[idx].steps = append(groups[idx].steps, s)
+	}
+
+	for _, group := range groups {
+		fmt.Fprintf(&b, "%-18s  %s\n", group.hookPoint, group.tableChain)
+		for _, s := range group.steps {
+			fmt.Fprintf(&b, "  |__ rule#%-6d %s\n", s.RuleNumber, s.Action)
+			if s.RawRule != "" {
+				fmt.Fprintf(&b, "      %s\n", s.RawRule)
+			}
 		}
 	}
 

@@ -82,9 +82,9 @@ func runTrace(args []string) int {
 	defer s.Stop()
 
 	// Build nft rule lookup cache for verbose human output (best-effort).
-	// Allows RenderVerbosePacket to show the raw rule text next to each step.
+	// Allows human output to show iptables-save rule text next to each step.
 	var ruleCache *tracer.RuleCache
-	if verbose && selectedFormat != formatJSON {
+	if selectedFormat != formatJSON {
 		ruleCache = tracer.BuildRuleCache()
 	}
 
@@ -115,10 +115,14 @@ func runTrace(args []string) int {
 		if buf == nil || len(buf.steps) == 0 {
 			return
 		}
+		steps := tracer.FilterDisplaySteps(buf.steps, filter)
+		if len(steps) == 0 {
+			return
+		}
 		if verbose {
-			os.Stdout.WriteString(output.RenderVerbosePacket(buf.steps, buf.pktNum, buf.traceID))
+			os.Stdout.WriteString(output.RenderVerbosePacket(steps, buf.pktNum, buf.traceID))
 		} else {
-			os.Stdout.WriteString(output.RenderBriefPacket(buf.steps))
+			os.Stdout.WriteString(output.RenderBriefPacket(steps))
 		}
 	}
 
