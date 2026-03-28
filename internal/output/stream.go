@@ -23,11 +23,16 @@ func RenderStepNDJSON(step model.TraceStep) (string, error) {
 // ─── Per-packet rendering ─────────────────────────────────────────────────────
 
 // RenderBriefPacket emits one compact verdict line per packet, followed by
-// the raw rule text of the matching step (if available).
+// the iptables-format rule text of the matching step (if available).
 //
-// Output format (drop):   [15:04:05.000] DROP    filter/INPUT  rule#85
-//                           └─ ip saddr 43.139.105.42 tcp dport 80 drop
-// Output format (accept): [15:04:05.000] ACCEPT
+// Drop example:
+//
+//	[21:51:51.143] DROP     filter/INPUT  rule#86
+//	        |__ -A INPUT -p tcp -m tcp --dport 80 -j DROP
+//
+// Accept example:
+//
+//	[21:51:51.143] ACCEPT
 func RenderBriefPacket(steps []model.TraceStep) string {
 	if len(steps) == 0 {
 		return ""
@@ -40,7 +45,7 @@ func RenderBriefPacket(steps []model.TraceStep) string {
 			line := fmt.Sprintf("[%s] %-7s  %s/%s  rule#%d\n",
 				ts, s.Action, s.Table, s.Chain, s.RuleNumber)
 			if s.RawRule != "" {
-				line += fmt.Sprintf("  └─ %s\n", s.RawRule)
+				line += fmt.Sprintf("        |__ %s\n", s.RawRule)
 			}
 			return line
 		}
@@ -50,20 +55,20 @@ func RenderBriefPacket(steps []model.TraceStep) string {
 	return fmt.Sprintf("[%s] ACCEPT\n", ts)
 }
 
-// RenderVerbosePacket emits a clearly bounded block showing every traversal step.
+// RenderVerbosePacket emits a multi-line block showing every traversal step,
+// with a plain-text rule annotation for every matched step.
 //
 // Example:
 //
-//	══ Packet #1  id=0x1a2b3c4d  43.139.105.42:55000 → 10.4.0.4:80 tcp ══════
-//	  PREROUTING   raw/PREROUTING         rule#107   CONTINUE
-//	▶ INPUT        filter/INPUT           rule#85    DROP
-//	      └─ ip saddr 43.139.105.42 tcp dport 80 drop
-//	────────────────────────────────────────────────────────────────────────────
+//	─── Packet #1  id=0x1a2b3c4d  43.139.105.42:55000 → 10.4.0.4:80 tcp
+//	PREROUTING        raw/PREROUTING              rule#107   CONTINUE
+//	  |__ -A PREROUTING -j TRACE
+//	INPUT             filter/INPUT                rule#85    DROP
+//	  |__ -A INPUT -p tcp -m tcp --dport 80 -j DROP
 func RenderVerbosePacket(steps []model.TraceStep, pktNum int, traceID uint32) string {
-	const width = 76
 	var b strings.Builder
 
-	// Build header: ID + 5-tuple from the first step that carries packet info.
+	// Header: ID + 5-tuple
 	idStr := ""
 	if traceID != 0 {
 		idStr = fmt.Sprintf("  id=0x%08x", traceID)
@@ -82,28 +87,17 @@ func RenderVerbosePacket(steps []model.TraceStep, pktNum int, traceID uint32) st
 			break
 		}
 	}
-	title := fmt.Sprintf("══ Packet #%d%s%s ", pktNum, idStr, tupleStr)
-	padding := width - len(title)
-	if padding < 4 {
-		padding = 4
-	}
-	fmt.Fprintf(&b, "%s%s\n", title, strings.Repeat("═", padding))
+	fmt.Fprintf(&b, "─── Packet #%d%s%s\n", pktNum, idStr, tupleStr)
 
-	// Steps
+	// One row per step; rule annotation on the next line if available.
 	for _, s := range steps {
-		marker := "  "
-		if s.Action == "DROP" || s.Action == "REJECT" {
-			marker = "▶ "
-		}
 		tableChain := fmt.Sprintf("%s/%s", s.Table, s.Chain)
-		fmt.Fprintf(&b, "%s%-16s  %-30s  rule#%-6d %s\n",
-			marker, s.HookPoint, tableChain, s.RuleNumber, s.Action)
+		fmt.Fprintf(&b, "%-18s  %-28s  rule#%-6d %s\n",
+			s.HookPoint, tableChain, s.RuleNumber, s.Action)
 		if s.RawRule != "" {
-			fmt.Fprintf(&b, "      └─ %s\n", s.RawRule)
+			fmt.Fprintf(&b, "  |__ %s\n", s.RawRule)
 		}
 	}
 
-	// Footer
-	fmt.Fprintln(&b, strings.Repeat("─", width))
 	return b.String()
 }

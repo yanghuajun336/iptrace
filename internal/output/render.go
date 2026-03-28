@@ -13,6 +13,9 @@ func RenderHuman(result model.TraceResult) string {
 	fmt.Fprintf(&b, "Backend: %s\n", result.Backend)
 	fmt.Fprintf(&b, "Packet:  %s %s:%d -> %s:%d\n", result.Packet.Protocol, result.Packet.SrcIP, result.Packet.SrcPort, result.Packet.DstIP, result.Packet.DstPort)
 	fmt.Fprintf(&b, "Verdict: %s\n", result.Verdict)
+	if result.VerdictRule != nil && result.VerdictRule.RawRule != "" {
+		fmt.Fprintf(&b, "Rule:    %s\n", result.VerdictRule.RawRule)
+	}
 	return b.String()
 }
 
