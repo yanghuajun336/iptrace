@@ -130,7 +130,7 @@ Comprehensive technical research on Linux kernel mechanisms for real-time packet
 
 **Project Manager / Tech Lead**:
 1. Start: [KERNEL_TRACE_RESEARCH_SUMMARY.md](KERNEL_TRACE_RESEARCH_SUMMARY.md) (5 min)
-2. Then: [ARCHITECTURE_DECISION_RECORD.md](ARCHITECTURE_DECISION_RECORD.md) (15 min)
+2. Then: [ARCHITECTURE_DECISION_RECORD.md](../ARCHITECTURE_DECISION_RECORD.md) (15 min)
 
 **Go Developer (Implementation)**:
 1. Start: [KERNEL_TRACE_DECISION.md](KERNEL_TRACE_DECISION.md) (20 min)
@@ -138,7 +138,7 @@ Comprehensive technical research on Linux kernel mechanisms for real-time packet
 3. Deep dive: [KERNEL_TRACE_MECHANISM_RESEARCH.md](KERNEL_TRACE_MECHANISM_RESEARCH.md) if stuck
 
 **Architect / Tech Reviewer**:
-1. Start: [ARCHITECTURE_DECISION_RECORD.md](ARCHITECTURE_DECISION_RECORD.md) (30 min)
+1. Start: [ARCHITECTURE_DECISION_RECORD.md](../ARCHITECTURE_DECISION_RECORD.md) (30 min)
 2. Validate: [KERNEL_TRACE_MECHANISM_RESEARCH.md](KERNEL_TRACE_MECHANISM_RESEARCH.md) (60 min)
 3. Reference: [KERNEL_TRACE_QUICK_REFERENCE.md](KERNEL_TRACE_QUICK_REFERENCE.md) for specifics
 
