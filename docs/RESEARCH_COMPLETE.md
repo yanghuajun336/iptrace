@@ -99,7 +99,7 @@ Key Details:
 | Document | Pages | Purpose | Audience | Read Time |
 |----------|:---:|---------|----------|:---:|
 | [KERNEL_TRACE_RESEARCH_SUMMARY.md](KERNEL_TRACE_RESEARCH_SUMMARY.md) | 3 | Executive summary | Leads, architects | 5 min |
-| [ARCHITECTURE_DECISION_RECORD.md](ARCHITECTURE_DECISION_RECORD.md) | 10 | Formal ADR | Tech leads, reviewers | 20 min |
+| [ARCHITECTURE_DECISION_RECORD.md](../ARCHITECTURE_DECISION_RECORD.md) | 10 | Formal ADR | Tech leads, reviewers | 20 min |
 | [KERNEL_TRACE_DECISION.md](KERNEL_TRACE_DECISION.md) | 8 | Implementation guide | Go developers | 25 min |
 | [KERNEL_TRACE_QUICK_REFERENCE.md](KERNEL_TRACE_QUICK_REFERENCE.md) | 5 | Developer cheat sheet | Implementers | 10 min (ongoing ref) |
 | [KERNEL_TRACE_MECHANISM_RESEARCH.md](KERNEL_TRACE_MECHANISM_RESEARCH.md) | 25 | Comprehensive analysis | Deep dives | 60 min |
@@ -324,7 +324,7 @@ ls -lh /home/joee/software/xtables/iptrace/ARCHITECTURE*.md
 Refer to relevant document:
 - **"How do I implement xt_TRACE?"** → [KERNEL_TRACE_DECISION.md](KERNEL_TRACE_DECISION.md), Section 6.3
 - **"What are the kernel requirements?"** → [KERNEL_TRACE_MECHANISM_RESEARCH.md](KERNEL_TRACE_MECHANISM_RESEARCH.md), Section 1.3
-- **"Why not eBPF?"** → [ARCHITECTURE_DECISION_RECORD.md](ARCHITECTURE_DECISION_RECORD.md), "Why NOT eBPF?"
+- **"Why not eBPF?"** → [ARCHITECTURE_DECISION_RECORD.md](../ARCHITECTURE_DECISION_RECORD.md), "Why NOT eBPF?"
 - **"Quick lookup on NFLOG parsing?"** → [KERNEL_TRACE_QUICK_REFERENCE.md](KERNEL_TRACE_QUICK_REFERENCE.md), Section 1
 - **"Full deep dive?"** → [KERNEL_TRACE_MECHANISM_RESEARCH.md](KERNEL_TRACE_MECHANISM_RESEARCH.md), all sections
 
