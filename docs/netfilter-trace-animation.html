@@ -746,10 +746,14 @@ class AnimCtrl{
   }
   pause(){this.paused=true;}
   resume(){this.paused=false;if(this._res){this._res();this._res=null;}}
-  stop(){this.stopped=true;this.paused=false;if(this._res){this._res();this._res=null;}}
+  stop(){
+    this.stopped=true;this.paused=false;
+    if(this._pendingTimer){clearTimeout(this._pendingTimer);this._pendingTimer=null;}
+    if(this._res){this._res();this._res=null;}
+  }
   wait(ms){
     return new Promise(res=>{
-      const t=setTimeout(()=>res(),ms);
+      const t=setTimeout(()=>{this._pendingTimer=null;res();},ms);
       this._pendingTimer=t;
     });
   }
@@ -1006,6 +1010,8 @@ function collectPkt(){
 }
 
 function doStartTrace(){
+  // Stop any running animation before starting a new one
+  if(anim){anim.stop();anim=null;}
   if(!parsed){setSt('请先解析规则','err');return;}
   const pkt=collectPkt();
   if(!pkt.ok){setSt('请填写必填字段','err');return;}
@@ -1025,7 +1031,7 @@ function doStartTrace(){
   document.getElementById('btn-trace').textContent='▶ 开始追踪';
   setCtrlState('running');
   anim=new AnimCtrl(layout,sim,curSpeed);
-  anim.run().catch(e=>console.warn(e));
+  anim.run().catch(e=>{console.warn(e);setCtrlState('idle');});
 }
 
 function doPause(){
