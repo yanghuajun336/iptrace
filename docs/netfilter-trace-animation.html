@@ -586,7 +586,6 @@ function matchRule(rule, pkt) {
 function simulate(tables, pkt, direction) {
   const path = PATH_DEFS[direction] || PATH_DEFS.inbound;
   const steps = [];
-  let dropped = false;
 
   for (let pi = 0; pi < path.length; pi++) {
     const node = path[pi];
@@ -608,7 +607,7 @@ function simulate(tables, pkt, direction) {
       customChainSteps: [] };
     steps.push(step);
     const verdict = traverseChain(tables, node.table, node.chain, pkt, step, step.customChainSteps);
-    if (verdict === 'DROP' || verdict === 'REJECT') { dropped = true; break; }
+    if (verdict === 'DROP' || verdict === 'REJECT') { break; }
   }
   return steps;
 }
@@ -1046,7 +1045,7 @@ function highlightCurrentStep(step, idx) {
           setTimeout(() => {
             const ruleEl = document.getElementById(`rule-${node.id}-${step.matchedIdx}`);
             if (ruleEl) ruleEl.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
-          }, 100);
+          }, 100); // allow DOM expansion to settle before scrolling
         }
       }
     }
