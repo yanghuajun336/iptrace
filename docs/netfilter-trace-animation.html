@@ -1,0 +1,1305 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Netfilter Packet Trace Visualizer</title>
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+:root{
+  --bg:#0d1117;--bg2:#161b22;--bg3:#21262d;
+  --bd:#30363d;--bd2:#21262d;
+  --t1:#c9d1d9;--t2:#8b949e;--t3:#6e7681;
+  --blue:#58a6ff;--green:#3fb950;--red:#f85149;
+  --orange:#d29922;--purple:#bc8cff;--yellow:#e3b341;
+}
+html,body{height:100%;overflow:hidden}
+body{
+  background:var(--bg);color:var(--t1);
+  font-family:-apple-system,BlinkMacSystemFont,'Segoe UI','Noto Sans SC',sans-serif;
+  font-size:13px;min-width:1200px;
+  display:flex;flex-direction:column;
+}
+
+/* ── Input Panel ── */
+#input-panel{
+  background:var(--bg2);border-bottom:1px solid var(--bd);
+  padding:10px 14px;display:flex;gap:14px;flex-shrink:0;
+}
+#rules-section{flex:1;min-width:360px;display:flex;flex-direction:column;gap:4px}
+.sec-label{font-size:10px;color:var(--t3);text-transform:uppercase;letter-spacing:.06em}
+#rules-textarea{
+  flex:1;min-height:120px;max-height:140px;
+  background:var(--bg3);border:1px solid var(--bd);border-radius:6px;
+  color:var(--t1);font-family:'SFMono-Regular',Consolas,monospace;font-size:10px;
+  padding:7px 9px;resize:vertical;outline:none;
+}
+#rules-textarea:focus{border-color:var(--blue);box-shadow:0 0 0 2px rgba(88,166,255,.15)}
+#packet-section{width:390px;flex-shrink:0;display:flex;flex-direction:column;gap:6px}
+.inp-row{display:flex;gap:8px}
+.inp-grp{flex:1;display:flex;flex-direction:column;gap:2px}
+.inp-grp label{font-size:10px;color:var(--t2)}
+.inp-grp input,.inp-grp select{
+  background:var(--bg3);border:1px solid var(--bd);border-radius:4px;
+  color:var(--t1);font-size:12px;padding:4px 7px;outline:none;width:100%;
+}
+.inp-grp input:focus,.inp-grp select:focus{border-color:var(--blue)}
+#start-btn{
+  background:var(--blue);color:#fff;border:none;border-radius:6px;
+  padding:7px 18px;font-size:13px;font-weight:600;cursor:pointer;
+  transition:opacity .15s;margin-top:auto;align-self:flex-end;
+}
+#start-btn:hover{opacity:.85}
+
+/* ── Viz Panel ── */
+#viz-panel{flex:1;overflow:auto;position:relative;padding:16px 20px;background:var(--bg)}
+#viz-canvas{position:relative}
+#arrows-svg{position:absolute;top:0;left:0;pointer-events:none;overflow:visible}
+
+/* ── Chain Node Card ── */
+.cnode{
+  position:absolute;width:152px;
+  background:var(--bg2);border:2px solid var(--bd);border-radius:8px;
+  cursor:pointer;transition:border-color .25s,box-shadow .25s;user-select:none;z-index:2;
+  overflow:hidden;
+}
+.cnode.ep{width:120px;cursor:default;border-style:dashed;background:var(--bg3)}
+.cnode.rt{width:118px;cursor:default;border-style:dashed;background:var(--bg3)}
+.cnode.unknown{border-style:dashed;opacity:.55}
+.cnode.s-checking{border-color:var(--blue);box-shadow:0 0 14px rgba(88,166,255,.45)}
+.cnode.s-pass{border-color:var(--green);box-shadow:0 0 8px rgba(63,185,80,.3)}
+.cnode.s-drop{border-color:var(--red);box-shadow:0 0 14px rgba(248,81,73,.45)}
+
+.nh{padding:7px 9px;display:flex;flex-direction:column;gap:1px}
+.nt{font-size:9px;color:var(--t3);text-transform:uppercase;letter-spacing:.04em}
+.nc{font-size:12px;font-weight:700;color:var(--t1);display:flex;justify-content:space-between;align-items:center}
+.nc-exp{font-size:10px;color:var(--blue);padding:0 2px}
+.nm{display:flex;justify-content:space-between;margin-top:2px}
+.np{font-size:9px;color:var(--t2)}
+.nk{font-size:9px;color:var(--t3)}
+.cnode.ep .nh,.cnode.rt .nh{padding:8px 10px}
+.cnode.ep .nc,.cnode.rt .nc{font-size:11px;color:var(--t2);justify-content:center}
+
+/* Rule list */
+.nrules{display:none;border-top:1px solid var(--bd);max-height:160px;overflow-y:auto}
+.cnode.expanded .nrules{display:block}
+.ri{
+  padding:3px 7px;font-size:9px;
+  font-family:'SFMono-Regular',Consolas,monospace;
+  border-bottom:1px solid var(--bg3);display:flex;align-items:flex-start;gap:3px;line-height:1.45;
+}
+.ri:last-child{border-bottom:none}
+.rs{font-size:11px;flex-shrink:0;margin-top:0px}
+.rt2{color:var(--t3);word-break:break-all;flex:1}
+.ri.r-skip .rt2{color:var(--green)}
+.ri.r-hit .rt2{color:var(--t1);font-weight:600}
+.ri.r-drop .rt2{color:var(--red);font-weight:600}
+.ri.r-nterm .rt2{color:var(--orange)}
+.ri.r-gray .rt2{color:var(--t3);opacity:.5}
+
+/* Unknown chain placeholder */
+.unknown-label{font-size:9px;color:var(--t3);text-align:center;padding:4px;font-style:italic}
+
+/* ── Packet Dot ── */
+#pdot{
+  position:absolute;width:14px;height:14px;border-radius:50%;
+  background:var(--blue);box-shadow:0 0 8px var(--blue);
+  z-index:10;pointer-events:none;transform:translate(-50%,-50%);
+  display:none;transition:left .35s cubic-bezier(.4,0,.2,1),top .35s cubic-bezier(.4,0,.2,1);
+}
+#pdot.p-accept{background:var(--green);box-shadow:0 0 10px var(--green)}
+#pdot.p-drop{background:var(--red);box-shadow:0 0 10px var(--red);animation:shatter .6s ease forwards}
+@keyframes shatter{
+  0%{transform:translate(-50%,-50%) scale(1);opacity:1}
+  40%{transform:translate(-50%,-50%) scale(2.2);opacity:.7}
+  100%{transform:translate(-50%,-50%) scale(0);opacity:0}
+}
+
+/* ── Info Panel ── */
+#info-panel{
+  background:var(--bg2);border-top:1px solid var(--bd);border-bottom:1px solid var(--bd);
+  padding:8px 14px;flex-shrink:0;display:flex;gap:20px;align-items:center;min-height:50px;
+  overflow:hidden;
+}
+.ii{display:flex;flex-direction:column;gap:1px;flex-shrink:0}
+.il{font-size:9px;color:var(--t3);text-transform:uppercase;letter-spacing:.04em}
+.iv{font-size:12px;color:var(--t1)}
+#i-step{font-size:15px;font-weight:700;color:var(--blue)}
+#i-node{font-weight:600}
+#i-desc{flex:1;font-size:11px;color:var(--t2);line-height:1.5;min-width:0}
+#i-rule{
+  font-family:'SFMono-Regular',Consolas,monospace;font-size:10px;color:var(--orange);
+  max-width:350px;word-break:break-all;
+}
+#i-verdict.v-accept{color:var(--green);font-weight:700}
+#i-verdict.v-drop{color:var(--red);font-weight:700}
+#i-verdict.v-reject{color:var(--red);font-weight:700}
+
+/* ── Controls ── */
+#controls{
+  background:var(--bg2);padding:8px 14px;
+  display:flex;align-items:center;gap:6px;flex-shrink:0;
+}
+.cb{
+  background:var(--bg3);border:1px solid var(--bd);border-radius:6px;
+  color:var(--t1);font-size:14px;width:34px;height:34px;
+  display:flex;align-items:center;justify-content:center;cursor:pointer;
+  transition:background .12s,border-color .12s;
+}
+.cb:hover:not(:disabled){background:var(--bg);border-color:var(--blue)}
+.cb:disabled{opacity:.35;cursor:default}
+#speed-btn{width:auto;padding:0 10px;font-size:11px;font-weight:600}
+.csep{width:1px;height:22px;background:var(--bd);margin:0 3px}
+#prog-wrap{flex:1;height:4px;background:var(--bg3);border-radius:2px;overflow:hidden;margin:0 6px}
+#prog-bar{height:100%;background:var(--blue);transition:width .2s;width:0%}
+
+/* ── Arrows ── */
+.ap{stroke:var(--bd);stroke-width:1.8;fill:none;transition:stroke .3s}
+.ap.a-active{stroke:var(--blue)}
+.ap.a-pass{stroke:var(--green)}
+.ap.a-drop{stroke:var(--red)}
+
+/* scrollbar */
+::-webkit-scrollbar{width:5px;height:5px}
+::-webkit-scrollbar-track{background:var(--bg)}
+::-webkit-scrollbar-thumb{background:var(--bd);border-radius:3px}
+</style>
+</head>
+<body>
+
+<!-- Input Panel -->
+<div id="input-panel">
+  <div id="rules-section">
+    <span class="sec-label">iptables 规则 (iptables-save 或 iptables -nvL 格式)</span>
+    <textarea id="rules-textarea" spellcheck="false" placeholder="粘贴 iptables 规则..."></textarea>
+  </div>
+  <div id="packet-section">
+    <span class="sec-label">数据包 5 元组</span>
+    <div class="inp-row">
+      <div class="inp-grp"><label>协议</label><input id="pkt-proto" value="tcp" placeholder="tcp/udp/icmp"></div>
+      <div class="inp-grp"><label>源 IP</label><input id="pkt-src-ip" value="8.82.191.80" placeholder="0.0.0.0"></div>
+      <div class="inp-grp"><label>目的 IP</label><input id="pkt-dst-ip" value="76.53.221.233" placeholder="0.0.0.0"></div>
+    </div>
+    <div class="inp-row">
+      <div class="inp-grp"><label>源端口</label><input id="pkt-sport" type="number" placeholder="可选"></div>
+      <div class="inp-grp"><label>目的端口</label><input id="pkt-dport" type="number" value="8090" placeholder="可选"></div>
+      <div class="inp-grp">
+        <label>方向</label>
+        <select id="pkt-dir">
+          <option value="inbound">Inbound 入站</option>
+          <option value="outbound">Outbound 出站</option>
+          <option value="forward">Forward 转发</option>
+        </select>
+      </div>
+      <div style="display:flex;align-items:flex-end">
+        <button id="start-btn">▶ 开始模拟</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Viz Panel -->
+<div id="viz-panel">
+  <div id="viz-canvas">
+    <svg id="arrows-svg"></svg>
+    <div id="pdot"></div>
+  </div>
+</div>
+
+<!-- Info Panel -->
+<div id="info-panel">
+  <div class="ii"><span class="il">步骤</span><span id="i-step" class="iv">-/-</span></div>
+  <div class="ii"><span class="il">当前节点</span><span id="i-node" class="iv">-</span></div>
+  <div id="i-desc">等待开始模拟...</div>
+  <div class="ii"><span class="il">匹配规则</span><span id="i-rule" class="iv">-</span></div>
+  <div class="ii"><span class="il">结果</span><span id="i-verdict" class="iv">-</span></div>
+</div>
+
+<!-- Controls -->
+<div id="controls">
+  <button class="cb" id="btn-back" title="后退一步" disabled>⏮</button>
+  <button class="cb" id="btn-play" title="播放">▶</button>
+  <button class="cb" id="btn-pause" title="暂停" style="display:none">⏸</button>
+  <button class="cb" id="btn-step" title="单步" disabled>⏭</button>
+  <button class="cb" id="btn-reset" title="重置">↺</button>
+  <div class="csep"></div>
+  <button class="cb" id="speed-btn" title="切换速度">🐢 慢速</button>
+  <div class="csep"></div>
+  <div id="prog-wrap"><div id="prog-bar"></div></div>
+</div>
+
+<script>
+'use strict';
+// ═══════════════════════════════════════════════════════════════════
+// CONSTANTS
+// ═══════════════════════════════════════════════════════════════════
+const SAMPLE_RULES = `*raw
+:PREROUTING ACCEPT [0:0]
+:OUTPUT ACCEPT [0:0]
+-A OUTPUT -d 8.82.191.80/32 -p tcp -m tcp --sport 80 -j DROP
+COMMIT
+*filter
+:INPUT DROP [0:0]
+:FORWARD DROP [0:0]
+:OUTPUT ACCEPT [0:0]
+:DOCKER - [0:0]
+:IPTRACE_TEST - [0:0]
+-A INPUT -m state --state RELATED,ESTABLISHED -j ACCEPT
+-A INPUT -s 8.82.191.80/32 -p tcp -m tcp --dport 8001 -j DROP
+-A INPUT -s 8.82.191.80/32 -p tcp -m tcp --dport 8002 -j REJECT --reject-with tcp-reset
+-A INPUT -s 8.82.191.80/32 -p tcp -m tcp --dport 8008 -j ACCEPT
+-A INPUT -s 8.82.191.80/32 -p tcp -m tcp --dport 8090 -j DROP
+-A INPUT -s 8.82.191.80/32 -p tcp -m multiport --dports 8005,8006,8007 -j DROP
+-A INPUT -s 8.82.191.80/32 -p tcp -m tcp --dport 7001 -j IPTRACE_TEST
+-A IPTRACE_TEST -p tcp -m tcp --dport 7001 -j DROP
+-A FORWARD -s 8.82.191.80/32 -j DROP
+COMMIT
+*nat
+:PREROUTING ACCEPT [0:0]
+:INPUT ACCEPT [0:0]
+:OUTPUT ACCEPT [0:0]
+:POSTROUTING ACCEPT [0:0]
+:DOCKER - [0:0]
+-A PREROUTING -m addrtype --dst-type LOCAL -j DOCKER
+-A DOCKER -i docker0 -j RETURN
+COMMIT`;
+
+const CHAIN_DESC = {
+  'raw/PREROUTING':'最早执行。用于设置连接跟踪豁免（NOTRACK）和 TRACE 调试标记。',
+  'mangle/PREROUTING':'修改报文头部字段（TTL/TOS/MARK），常用于 QoS 和策略路由标记。',
+  'nat/PREROUTING':'DNAT 阶段。检查是否需要做目标地址/端口转换。',
+  'mangle/INPUT':'入站报文的 mangle 处理。',
+  'filter/INPUT':'入站过滤核心。大多数防火墙规则在此。',
+  'security/INPUT':'SELinux 安全标签处理（入站）。',
+  'raw/OUTPUT':'本机发出报文最早阶段。',
+  'mangle/OUTPUT':'修改本机出站报文头部。',
+  'nat/OUTPUT':'本机出站 DNAT。',
+  'filter/OUTPUT':'本机出站过滤。',
+  'security/OUTPUT':'出站 SELinux 处理。',
+  'mangle/FORWARD':'转发报文的 mangle 处理。',
+  'filter/FORWARD':'转发过滤核心。',
+  'security/FORWARD':'转发 SELinux 处理。',
+  'mangle/POSTROUTING':'出站前最后的 mangle 修改。',
+  'nat/POSTROUTING':'SNAT/MASQUERADE 阶段。源地址替换。',
+};
+
+// Layout: COL_W pixels per column, ROW_H pixels per row
+const COL_W = 182, ROW_H = 165;
+const NODE_W = 152, EP_W = 118, RT_W = 118;
+const NODE_H = 72; // collapsed height
+const PAD_X = 14, PAD_Y = 16;
+
+// Path node definitions per direction
+// row/col define grid position; type: 'chain'|'ep'|'rt'
+const PATH_DEFS = {
+  inbound:[
+    {id:'net',       type:'ep',    label:'🌐 网络',       row:0,col:0},
+    {id:'raw-pre',   type:'chain', table:'raw',      chain:'PREROUTING', row:0,col:1},
+    {id:'mangle-pre',type:'chain', table:'mangle',   chain:'PREROUTING', row:0,col:2},
+    {id:'nat-pre',   type:'chain', table:'nat',      chain:'PREROUTING', row:0,col:3},
+    {id:'routing',   type:'rt',    label:'🔀 路由决策 (→INPUT)', row:0,col:4},
+    {id:'mangle-in', type:'chain', table:'mangle',   chain:'INPUT',      row:1,col:4},
+    {id:'filter-in', type:'chain', table:'filter',   chain:'INPUT',      row:1,col:5},
+    {id:'sec-in',    type:'chain', table:'security', chain:'INPUT',      row:1,col:6},
+    {id:'local',     type:'ep',    label:'📦 本地进程', row:1,col:7},
+  ],
+  outbound:[
+    {id:'local-out', type:'ep',    label:'📦 本地进程', row:0,col:0},
+    {id:'raw-out',   type:'chain', table:'raw',      chain:'OUTPUT',      row:0,col:1},
+    {id:'mangle-out',type:'chain', table:'mangle',   chain:'OUTPUT',      row:0,col:2},
+    {id:'nat-out',   type:'chain', table:'nat',      chain:'OUTPUT',      row:0,col:3},
+    {id:'filter-out',type:'chain', table:'filter',   chain:'OUTPUT',      row:0,col:4},
+    {id:'sec-out',   type:'chain', table:'security', chain:'OUTPUT',      row:0,col:5},
+    {id:'routing',   type:'rt',    label:'🔀 路由决策', row:0,col:6},
+    {id:'mangle-post',type:'chain',table:'mangle',   chain:'POSTROUTING', row:1,col:6},
+    {id:'nat-post',  type:'chain', table:'nat',      chain:'POSTROUTING', row:1,col:7},
+    {id:'net-out',   type:'ep',    label:'🌐 网络',      row:1,col:8},
+  ],
+  forward:[
+    {id:'net-f',       type:'ep',    label:'🌐 网络',       row:0,col:0},
+    {id:'raw-pre-f',   type:'chain', table:'raw',      chain:'PREROUTING',  row:0,col:1},
+    {id:'mangle-pre-f',type:'chain', table:'mangle',   chain:'PREROUTING',  row:0,col:2},
+    {id:'nat-pre-f',   type:'chain', table:'nat',      chain:'PREROUTING',  row:0,col:3},
+    {id:'routing-f',   type:'rt',    label:'🔀 路由决策 (→FORWARD)', row:0,col:4},
+    {id:'mangle-fwd',  type:'chain', table:'mangle',   chain:'FORWARD',     row:1,col:4},
+    {id:'filter-fwd',  type:'chain', table:'filter',   chain:'FORWARD',     row:1,col:5},
+    {id:'sec-fwd',     type:'chain', table:'security', chain:'FORWARD',     row:1,col:6},
+    {id:'mangle-post-f',type:'chain',table:'mangle',   chain:'POSTROUTING', row:1,col:7},
+    {id:'nat-post-f',  type:'chain', table:'nat',      chain:'POSTROUTING', row:1,col:8},
+    {id:'net-out-f',   type:'ep',    label:'🌐 网络',       row:1,col:9},
+  ]
+};
+
+// ═══════════════════════════════════════════════════════════════════
+// RULE PARSER
+// ═══════════════════════════════════════════════════════════════════
+function parseRules(text) {
+  const t = text.trim();
+  if (!t) return {};
+  // Detect format: iptables-save has *tablename and COMMIT
+  if (/^\*\w+/m.test(t)) return parseSaveFormat(t);
+  return parseNvLFormat(t);
+}
+
+function parseSaveFormat(text) {
+  const tables = {};
+  let cur = null;
+  for (const rawLine of text.split('\n')) {
+    const line = rawLine.trim();
+    if (!line || line.startsWith('#')) continue;
+    if (line.startsWith('*')) {
+      cur = line.slice(1).trim();
+      tables[cur] = { chains: {} };
+    } else if (line === 'COMMIT') {
+      cur = null;
+    } else if (cur) {
+      if (line.startsWith(':')) {
+        // :CHAIN POLICY [pkts:bytes]
+        const m = line.match(/^:(\S+)\s+(\S+)/);
+        if (m) {
+          tables[cur].chains[m[1]] = { policy: m[2] === '-' ? 'ACCEPT' : m[2], rules: [] };
+        }
+      } else if (line.startsWith('-N')) {
+        const ch = line.split(/\s+/)[1];
+        if (ch && !tables[cur].chains[ch]) {
+          tables[cur].chains[ch] = { policy: null, rules: [] };
+        }
+      } else if (line.startsWith('-A') || line.startsWith('-I')) {
+        applyRule(line, tables[cur]);
+      }
+    }
+  }
+  return tables;
+}
+
+function parseNvLFormat(text) {
+  const tables = {};
+  let curTable = 'filter';
+  let curChain = null;
+  let skipHeader = false;
+
+  for (const rawLine of text.split('\n')) {
+    const line = rawLine.trim();
+    if (!line) { curChain = null; skipHeader = false; continue; }
+
+    // "# Generated by..." or table header like "# Table: filter"
+    const tableM = line.match(/^#\s+Table:\s+(\w+)/i);
+    if (tableM) { curTable = tableM[1]; if (!tables[curTable]) tables[curTable] = { chains:{} }; continue; }
+
+    // Chain header: "Chain INPUT (policy DROP 10 packets, 800 bytes)"
+    const chainM = line.match(/^Chain\s+(\S+)\s+\(policy\s+(\w+)/i);
+    if (chainM) {
+      curChain = chainM[1];
+      if (!tables[curTable]) tables[curTable] = { chains:{} };
+      tables[curTable].chains[curChain] = { policy: chainM[2], rules: [] };
+      skipHeader = true;
+      continue;
+    }
+    // Chain header without policy (custom chain): "Chain DOCKER (1 references)"
+    const chainM2 = line.match(/^Chain\s+(\S+)\s+\(/i);
+    if (chainM2) {
+      curChain = chainM2[1];
+      if (!tables[curTable]) tables[curTable] = { chains:{} };
+      if (!tables[curTable].chains[curChain]) {
+        tables[curTable].chains[curChain] = { policy: null, rules: [] };
+      }
+      skipHeader = true;
+      continue;
+    }
+    // Column header line
+    if (skipHeader && /^\s*pkts\s+bytes/i.test(line)) { skipHeader = false; continue; }
+    if (!curChain) continue;
+
+    // Rule line: "  10  800 DROP  tcp -- * * 0.0.0.0/0  0.0.0.0/0  ..."
+    // Parse nvL rule into a synthetic -A line
+    const rule = parseNvLRule(line, curChain);
+    if (rule) tables[curTable].chains[curChain].rules.push(rule);
+  }
+  return tables;
+}
+
+function parseNvLRule(line, chain) {
+  // nvL columns: pkts bytes target prot opt in out source destination [options]
+  const parts = line.split(/\s+/);
+  if (parts.length < 9) return null;
+  // pkts(0) bytes(1) target(2) prot(3) opt(4) in(5) out(6) source(7) dest(8) rest...
+  const target = parts[2];
+  if (!target || target === 'target') return null;
+  const proto = parts[3] !== 'all' ? parts[3] : null;
+  const src = parts[7] !== '0.0.0.0/0' && parts[7] !== '::/0' ? parts[7] : null;
+  const dst = parts[8] !== '0.0.0.0/0' && parts[8] !== '::/0' ? parts[8] : null;
+  const rest = parts.slice(9).join(' ');
+
+  const rule = {
+    srcIP: src, srcIPNeg: false,
+    dstIP: dst, dstIPNeg: false,
+    proto: proto, protoNeg: false,
+    sport: null, dport: null, multiports: null,
+    target: target.split('/')[0], // handle REJECT/tcp-reset
+    rawText: line.trim(),
+  };
+  // Parse extra options
+  const dportM = rest.match(/dpt:(\d+)/);
+  if (dportM) rule.dport = dportM[1];
+  const sportM = rest.match(/spt:(\d+)/);
+  if (sportM) rule.sport = sportM[1];
+  const dportsM = rest.match(/dpts:(\S+)/);
+  if (dportsM) rule.multiports = dportsM[1].split(',');
+  return rule;
+}
+
+function tokenize(line) {
+  // Simple tokenizer that handles quoted strings
+  const tokens = [];
+  let i = 0;
+  while (i < line.length) {
+    while (i < line.length && /\s/.test(line[i])) i++;
+    if (i >= line.length) break;
+    if (line[i] === '"' || line[i] === "'") {
+      const q = line[i++];
+      let s = '';
+      while (i < line.length && line[i] !== q) s += line[i++];
+      if (i < line.length) i++;
+      tokens.push(s);
+    } else {
+      let s = '';
+      while (i < line.length && !/\s/.test(line[i])) s += line[i++];
+      tokens.push(s);
+    }
+  }
+  return tokens;
+}
+
+// Flags carrying conditions we cannot evaluate in a pure frontend simulation
+const UNRESOLVABLE_COND_FLAGS = new Set([
+  '--state','--ctstate','--dst-type','--src-type','--match-set',
+  '--limit','--limit-burst','--src-range','--dst-range',
+  '--uid-owner','--gid-owner','--pid-owner',
+  '--string','--hex-string','--algo',
+  '--timestart','--timestop','--datestop','--datestart',
+  '--weekdays','--monthdays','--connbytes','--connbytes-dir',
+  '--connbytes-mode','--connlimit-above','--connlimit-mask',
+  '--pkt-type','--physdev-in','--physdev-out',
+  '--physdev-is-in','--physdev-is-out',
+]);
+// Action modifier flags (not conditions) - skip with optional value
+const ACTION_FLAGS = new Set([
+  '--reject-with','--log-prefix','--log-level','--log-uid',
+  '--to-destination','--to-source','--to-ports',
+  '--set-mark','--save-mark','--restore-mark','--nfqueue-num',
+  '--clamp-mss-to-pmtu','--set-mss','--ttl-set','--ttl-inc','--ttl-dec',
+  '--tos-set','--tos-or','--tos-and','--comment','--newname','--gateway',
+]);
+
+function applyRule(line, table) {
+  const args = tokenize(line);
+  if (!args.length) return;
+  let chain = null;
+  const rule = {
+    srcIP: null, srcIPNeg: false,
+    dstIP: null, dstIPNeg: false,
+    proto: null, protoNeg: false,
+    sport: null, dport: null, multiports: null,
+    target: null, rawText: line,
+    hasUnknownCond: false,
+  };
+  let i = 0, neg = false;
+  while (i < args.length) {
+    const a = args[i];
+    if (a === '-A' || a === '-I') { chain = args[++i]; }
+    else if (a === '!') { neg = true; i++; continue; }
+    else if (a === '-s' || a === '--source') { rule.srcIP = args[++i]; rule.srcIPNeg = neg; neg = false; }
+    else if (a === '-d' || a === '--destination') { rule.dstIP = args[++i]; rule.dstIPNeg = neg; neg = false; }
+    else if (a === '-p' || a === '--protocol') { rule.proto = args[++i]; rule.protoNeg = neg; neg = false; }
+    else if (a === '--sport' || a === '--source-port') { rule.sport = args[++i]; }
+    else if (a === '--dport' || a === '--destination-port') { rule.dport = args[++i]; }
+    else if (a === '--dports' || a === '--destination-ports') { rule.multiports = args[++i].split(','); }
+    else if (a === '--sports' || a === '--source-ports') { i++; }
+    else if (a === '-j' || a === '--jump') { rule.target = args[++i]; }
+    else if (a === '-g' || a === '--goto') { rule.target = args[++i]; }
+    else if (a === '-i' || a === '--in-interface' || a === '-o' || a === '--out-interface') { i++; }
+    else if (a === '-m' || a === '--match') { i++; /* skip module name only */ }
+    else if (UNRESOLVABLE_COND_FLAGS.has(a)) { rule.hasUnknownCond = true; i++; }
+    else if (ACTION_FLAGS.has(a)) {
+      if (i + 1 < args.length && !args[i + 1].startsWith('-')) i++;
+    }
+    neg = false;
+    i++;
+  }
+  if (!chain || !rule.target) return;
+  if (!table.chains[chain]) table.chains[chain] = { policy: 'ACCEPT', rules: [] };
+  table.chains[chain].rules.push(rule);
+}
+
+// ═══════════════════════════════════════════════════════════════════
+// RULE MATCHER
+// ═══════════════════════════════════════════════════════════════════
+function ipToNum(ip) {
+  const parts = ip.split('.');
+  if (parts.length !== 4) return 0;
+  return parts.reduce((acc, p) => ((acc << 8) + (parseInt(p, 10) || 0)) >>> 0, 0);
+}
+
+function cidrMatch(ip, cidr) {
+  if (!ip || !cidr) return false;
+  if (!cidr.includes('/')) return ip === cidr;
+  const [net, bitsStr] = cidr.split('/');
+  const bits = parseInt(bitsStr, 10);
+  if (bits === 0) return true;
+  const mask = bits >= 32 ? 0xFFFFFFFF : ((0xFFFFFFFF << (32 - bits)) >>> 0);
+  return (ipToNum(ip) & mask) === (ipToNum(net) & mask);
+}
+
+function matchRule(rule, pkt) {
+  // Rules with unresolvable conditions (e.g. -m state --state) cannot be evaluated
+  if (rule.hasUnknownCond) return false;
+  if (rule.srcIP) {
+    const m = cidrMatch(pkt.srcIP, rule.srcIP);
+    if (rule.srcIPNeg ? m : !m) return false;
+  }
+  if (rule.dstIP) {
+    const m = cidrMatch(pkt.dstIP, rule.dstIP);
+    if (rule.dstIPNeg ? m : !m) return false;
+  }
+  if (rule.proto) {
+    const m = pkt.proto && pkt.proto.toLowerCase() === rule.proto.toLowerCase();
+    if (rule.protoNeg ? m : !m) return false;
+  }
+  if (rule.sport !== null && rule.sport !== undefined && rule.sport !== '') {
+    if (pkt.sport !== parseInt(rule.sport, 10)) return false;
+  }
+  if (rule.dport !== null && rule.dport !== undefined && rule.dport !== '') {
+    if (pkt.dport !== parseInt(rule.dport, 10)) return false;
+  }
+  if (rule.multiports && rule.multiports.length) {
+    if (!rule.multiports.includes(String(pkt.dport))) return false;
+  }
+  return true;
+}
+
+// ═══════════════════════════════════════════════════════════════════
+// TRAVERSAL SIMULATOR
+// Returns array of steps. Each step:
+//   { type:'chain', table, chain, ruleResults[], matchedIdx, verdict, customChain? }
+//   { type:'ep'|'rt', nodeId, label }
+// ═══════════════════════════════════════════════════════════════════
+function simulate(tables, pkt, direction) {
+  const path = PATH_DEFS[direction] || PATH_DEFS.inbound;
+  const steps = [];
+
+  for (let pi = 0; pi < path.length; pi++) {
+    const node = path[pi];
+    if (node.type === 'ep' || node.type === 'rt') {
+      steps.push({ type: node.type, nodeId: node.id, label: node.label || '' });
+      continue;
+    }
+    // chain node
+    const tData = tables[node.table];
+    const cData = tData && tData.chains[node.chain];
+    if (!cData) {
+      // unknown / not provided
+      steps.push({ type: 'chain', nodeId: node.id, table: node.table, chain: node.chain,
+        ruleResults: [], matchedIdx: -1, verdict: 'UNKNOWN', provided: false });
+      continue;
+    }
+    const step = { type: 'chain', nodeId: node.id, table: node.table, chain: node.chain,
+      ruleResults: cData.rules.map(() => 'unvisited'), matchedIdx: -1, verdict: null, provided: true,
+      customChainSteps: [] };
+    steps.push(step);
+    const verdict = traverseChain(tables, node.table, node.chain, pkt, step, step.customChainSteps);
+    if (verdict === 'DROP' || verdict === 'REJECT') { break; }
+  }
+  return steps;
+}
+
+function traverseChain(tables, tableName, chainName, pkt, stepRef, customChainSteps) {
+  const tData = tables[tableName];
+  const cData = tData && tData.chains[chainName];
+  if (!cData) return 'ACCEPT';
+
+  const rules = cData.rules;
+  const rr = stepRef ? stepRef.ruleResults : rules.map(() => 'unvisited');
+
+  for (let i = 0; i < rules.length; i++) {
+    const rule = rules[i];
+    if (matchRule(rule, pkt)) {
+      if (rr) rr[i] = 'matched';
+      const target = rule.target;
+      if (stepRef) { stepRef.matchedIdx = i; stepRef.verdict = target; }
+
+      // Mark unreached rules
+      if (rr && (target === 'DROP' || target === 'REJECT' || target === 'ACCEPT' || target === 'RETURN')) {
+        for (let j = i + 1; j < rules.length; j++) rr[j] = 'unreached';
+      }
+
+      if (target === 'ACCEPT') return 'ACCEPT';
+      if (target === 'DROP') return 'DROP';
+      if (target === 'REJECT') return 'REJECT';
+      if (target === 'RETURN') return 'RETURN';
+      if (target === 'LOG' || target === 'MARK' || target === 'TRACE' || target === 'CONNMARK') {
+        if (rr) rr[i] = 'nterm'; // non-terminal, continue
+        if (stepRef) { stepRef.matchedIdx = -1; stepRef.verdict = null; }
+        continue;
+      }
+      // Jump to custom chain
+      const customChain = tData && tData.chains[target];
+      if (customChain) {
+        const customStep = {
+          type: 'custom', nodeId: 'custom-' + target, table: tableName, chain: target,
+          ruleResults: customChain.rules.map(() => 'unvisited'), matchedIdx: -1, verdict: null, provided: true,
+          customChainSteps: []
+        };
+        if (customChainSteps) customChainSteps.push(customStep);
+        const jumpResult = traverseChain(tables, tableName, target, pkt, customStep, customStep.customChainSteps);
+        if (jumpResult === 'DROP' || jumpResult === 'REJECT') {
+          if (stepRef) stepRef.verdict = jumpResult;
+          return jumpResult;
+        }
+        if (jumpResult === 'ACCEPT') {
+          if (stepRef) stepRef.verdict = 'ACCEPT';
+          return 'ACCEPT';
+        }
+        // RETURN or no match - continue in parent chain
+        if (rr) rr[i] = 'jumped-ret';
+        if (stepRef) { stepRef.matchedIdx = -1; stepRef.verdict = null; }
+        continue;
+      }
+      // Unknown target (like external tool)
+      if (rr) rr[i] = 'nterm';
+      continue;
+    } else {
+      if (rr) rr[i] = 'skipped';
+    }
+  }
+  // No rule matched: use policy
+  const policy = cData.policy || 'ACCEPT';
+  if (stepRef) stepRef.verdict = 'POLICY:' + policy;
+  return policy;
+}
+
+// ═══════════════════════════════════════════════════════════════════
+// LAYOUT / RENDERER
+// ═══════════════════════════════════════════════════════════════════
+let currentPath = [];
+let currentTables = {};
+let simSteps = [];
+let currentStepIdx = -1;
+let playTimer = null;
+const SPEEDS = [{label:'🐢 慢速', ms:1200},{label:'🚶 正常', ms:600},{label:'⚡ 快速', ms:250}];
+let speedIdx = 1;
+
+function nodeWidth(node) {
+  if (node.type === 'ep') return EP_W;
+  if (node.type === 'rt') return RT_W;
+  return NODE_W;
+}
+
+function nodeX(node) { return PAD_X + node.col * COL_W; }
+function nodeY(node) { return PAD_Y + node.row * ROW_H; }
+function nodeCX(node) { return nodeX(node) + nodeWidth(node) / 2; }
+function nodeCY(node) { return nodeY(node) + NODE_H / 2; }
+
+function buildLayout(direction, tables) {
+  currentPath = PATH_DEFS[direction] || PATH_DEFS.inbound;
+  currentTables = tables;
+
+  // Compute canvas size
+  let maxCol = 0, maxRow = 0;
+  for (const n of currentPath) {
+    if (n.col > maxCol) maxCol = n.col;
+    if (n.row > maxRow) maxRow = n.row;
+  }
+  const canvasW = PAD_X * 2 + (maxCol + 1) * COL_W;
+  const canvasH = PAD_Y * 2 + (maxRow + 1) * ROW_H;
+
+  const canvas = document.getElementById('viz-canvas');
+  canvas.style.width = canvasW + 'px';
+  canvas.style.height = canvasH + 'px';
+
+  // Remove old nodes
+  canvas.querySelectorAll('.cnode').forEach(e => e.remove());
+
+  // Build nodes
+  for (const node of currentPath) {
+    canvas.appendChild(makeNodeEl(node, tables));
+  }
+
+  // Arrows
+  buildArrows(currentPath);
+}
+
+function makeNodeEl(node, tables) {
+  const div = document.createElement('div');
+  div.className = 'cnode' + (node.type === 'ep' ? ' ep' : node.type === 'rt' ? ' rt' : '');
+  div.id = 'node-' + node.id;
+  div.style.left = nodeX(node) + 'px';
+  div.style.top = nodeY(node) + 'px';
+  div.style.width = nodeWidth(node) + 'px';
+
+  if (node.type === 'ep' || node.type === 'rt') {
+    const nh = document.createElement('div');
+    nh.className = 'nh';
+    const nc = document.createElement('div');
+    nc.className = 'nc';
+    nc.textContent = node.label;
+    nh.appendChild(nc);
+    div.appendChild(nh);
+    return div;
+  }
+
+  // Chain node
+  const tData = tables[node.table];
+  const cData = tData && tData.chains[node.chain];
+  const provided = !!cData;
+  if (!provided) div.classList.add('unknown');
+
+  const nh = document.createElement('div');
+  nh.className = 'nh';
+
+  const nt = document.createElement('div');
+  nt.className = 'nt';
+  nt.textContent = node.table;
+
+  const nc = document.createElement('div');
+  nc.className = 'nc';
+  const ncText = document.createElement('span');
+  ncText.textContent = node.chain;
+  nc.appendChild(ncText);
+  if (provided) {
+    const expBtn = document.createElement('span');
+    expBtn.className = 'nc-exp';
+    expBtn.textContent = '▼';
+    nc.appendChild(expBtn);
+  }
+
+  const nm = document.createElement('div');
+  nm.className = 'nm';
+  const np = document.createElement('span');
+  np.className = 'np';
+  np.textContent = provided ? ('policy: ' + (cData.policy || 'ACCEPT')) : '';
+  const nk = document.createElement('span');
+  nk.className = 'nk';
+  nk.textContent = provided ? (cData.rules.length + ' 规则') : '';
+
+  nm.appendChild(np);
+  nm.appendChild(nk);
+  nh.appendChild(nt);
+  nh.appendChild(nc);
+  nh.appendChild(nm);
+  div.appendChild(nh);
+
+  if (!provided) {
+    const ul = document.createElement('div');
+    ul.className = 'unknown-label';
+    ul.textContent = '未提供规则';
+    div.appendChild(ul);
+  } else {
+    const nrules = document.createElement('div');
+    nrules.className = 'nrules';
+    nrules.id = 'rules-' + node.id;
+    div.appendChild(nrules);
+  }
+
+  // Click to expand/collapse
+  if (provided) {
+    div.addEventListener('click', () => {
+      const expanded = div.classList.toggle('expanded');
+      const btn = div.querySelector('.nc-exp');
+      if (btn) btn.textContent = expanded ? '▲' : '▼';
+      if (expanded) renderRuleList(node, tables);
+    });
+  }
+  return div;
+}
+
+function renderRuleList(node, tables, stepRuleResults, matchedIdx) {
+  const tData = tables[node.table];
+  const cData = tData && tData.chains[node.chain];
+  if (!cData) return;
+  const container = document.getElementById('rules-' + node.id);
+  if (!container) return;
+  container.innerHTML = '';
+
+  const rr = stepRuleResults || cData.rules.map(() => 'unvisited');
+
+  for (let i = 0; i < cData.rules.length; i++) {
+    const rule = cData.rules[i];
+    const status = rr[i] || 'unvisited';
+    const ri = document.createElement('div');
+    ri.className = 'ri';
+    ri.id = 'rule-' + node.id + '-' + i;
+
+    const rs = document.createElement('span');
+    rs.className = 'rs';
+    const rt2 = document.createElement('span');
+    rt2.className = 'rt2';
+    rt2.textContent = rule.rawText.replace(/^-[AI]\s+\S+\s+/, '').trim() || rule.rawText;
+
+    if (status === 'skipped') {
+      ri.classList.add('r-skip'); rs.textContent = rule.hasUnknownCond ? '⚠️' : '✅';
+    } else if (status === 'matched') {
+      const t = rule.target;
+      if (t === 'DROP' || t === 'REJECT') { ri.classList.add('r-drop'); rs.textContent = '⛔'; }
+      else if (t === 'ACCEPT') { ri.classList.add('r-hit'); rs.textContent = '✅'; }
+      else { ri.classList.add('r-hit'); rs.textContent = '↪'; }
+    } else if (status === 'nterm') {
+      ri.classList.add('r-nterm'); rs.textContent = '📝';
+    } else if (status === 'jumped-ret') {
+      ri.classList.add('r-hit'); rs.textContent = '↩';
+    } else if (status === 'unreached') {
+      ri.classList.add('r-gray'); rs.textContent = '⚪';
+    } else {
+      rs.textContent = '·';
+    }
+    ri.appendChild(rs);
+    ri.appendChild(rt2);
+    container.appendChild(ri);
+  }
+}
+
+// ═══════════════════════════════════════════════════════════════════
+// ARROW DRAWING
+// ═══════════════════════════════════════════════════════════════════
+function buildArrows(path) {
+  const svg = document.getElementById('arrows-svg');
+  svg.innerHTML = `
+    <defs>
+      <marker id="mdef" markerWidth="6" markerHeight="6" refX="5" refY="3" orient="auto">
+        <path d="M0,0 L6,3 L0,6 Z" fill="#30363d"/>
+      </marker>
+      <marker id="mblue" markerWidth="6" markerHeight="6" refX="5" refY="3" orient="auto">
+        <path d="M0,0 L6,3 L0,6 Z" fill="#58a6ff"/>
+      </marker>
+      <marker id="mgreen" markerWidth="6" markerHeight="6" refX="5" refY="3" orient="auto">
+        <path d="M0,0 L6,3 L0,6 Z" fill="#3fb950"/>
+      </marker>
+      <marker id="mred" markerWidth="6" markerHeight="6" refX="5" refY="3" orient="auto">
+        <path d="M0,0 L6,3 L0,6 Z" fill="#f85149"/>
+      </marker>
+    </defs>`;
+
+  for (let i = 0; i + 1 < path.length; i++) {
+    const from = path[i], to = path[i + 1];
+    drawArrow(svg, from, to, `${from.id}-${to.id}`);
+  }
+}
+
+function drawArrow(svg, from, to, id) {
+  // Source: right-center or bottom-center of 'from'
+  // Target: left-center or top-center of 'to'
+  const fw = nodeWidth(from), tw = nodeWidth(to);
+  const fx0 = nodeX(from), fy0 = nodeY(from);
+  const tx0 = nodeX(to),   ty0 = nodeY(to);
+
+  let d;
+  if (from.row === to.row) {
+    // Same row: horizontal arrow
+    const x1 = fx0 + fw; const y1 = fy0 + NODE_H / 2;
+    const x2 = tx0 + 2;  const y2 = ty0 + NODE_H / 2;
+    d = `M${x1},${y1} L${x2},${y2}`;
+  } else if (from.col === to.col) {
+    // Same col, diff row: vertical arrow (e.g. routing → mangle/input)
+    const x1 = fx0 + fw / 2; const y1 = fy0 + NODE_H;
+    const x2 = tx0 + tw / 2; const y2 = ty0 - 2;
+    d = `M${x1},${y1} L${x2},${y2}`;
+  } else {
+    // Different row and col: L-shape going down then horizontal
+    const x1 = fx0 + fw / 2; const y1 = fy0 + NODE_H;
+    const midY = fy0 + NODE_H + (ty0 - fy0 - NODE_H) / 2;
+    const x2 = tx0 + tw / 2; const y2 = ty0 - 2;
+    d = `M${x1},${y1} L${x1},${midY} L${x2},${midY} L${x2},${y2}`;
+  }
+
+  const p = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+  p.setAttribute('d', d);
+  p.setAttribute('class', 'ap');
+  p.setAttribute('id', 'arr-' + id);
+  p.setAttribute('marker-end', 'url(#mdef)');
+  svg.appendChild(p);
+}
+
+function setArrowState(from, to, state) {
+  const id = `arr-${from.id}-${to.id}`;
+  const p = document.getElementById(id);
+  if (!p) return;
+  p.setAttribute('class', 'ap' + (state ? ' a-' + state : ''));
+  const mk = state === 'pass' ? 'mgreen' : state === 'drop' ? 'mred' : state === 'active' ? 'mblue' : 'mdef';
+  p.setAttribute('marker-end', `url(#${mk})`);
+}
+
+// ═══════════════════════════════════════════════════════════════════
+// ANIMATION
+// ═══════════════════════════════════════════════════════════════════
+function resetViz() {
+  if (!currentPath.length) return;
+  // Reset all node states
+  for (const node of currentPath) {
+    const el = document.getElementById('node-' + node.id);
+    if (!el) continue;
+    el.className = el.className.replace(/\s*s-\w+/g, '');
+    el.classList.remove('expanded');
+    const btn = el.querySelector('.nc-exp');
+    if (btn) btn.textContent = '▼';
+    const nrules = el.querySelector('.nrules');
+    if (nrules) nrules.innerHTML = '';
+  }
+  // Reset arrows
+  const svg = document.getElementById('arrows-svg');
+  svg.querySelectorAll('.ap').forEach(p => {
+    p.setAttribute('class', 'ap');
+    p.setAttribute('marker-end', 'url(#mdef)');
+  });
+  // Reset packet dot
+  const dot = document.getElementById('pdot');
+  dot.style.display = 'none';
+  dot.className = '';
+  // Reset info
+  document.getElementById('i-step').textContent = '-/-';
+  document.getElementById('i-node').textContent = '-';
+  document.getElementById('i-desc').textContent = '等待开始模拟...';
+  document.getElementById('i-rule').textContent = '-';
+  const vd = document.getElementById('i-verdict');
+  vd.textContent = '-';
+  vd.className = 'iv';
+  document.getElementById('prog-bar').style.width = '0%';
+}
+
+function applyStep(idx) {
+  if (!simSteps.length) return;
+  idx = Math.max(0, Math.min(simSteps.length - 1, idx));
+  currentStepIdx = idx;
+  const step = simSteps[idx];
+
+  // Update progress
+  document.getElementById('prog-bar').style.width = ((idx + 1) / simSteps.length * 100) + '%';
+  document.getElementById('i-step').textContent = `${idx + 1}/${simSteps.length}`;
+
+  // Clear all node states first (for going back)
+  for (const node of currentPath) {
+    const el = document.getElementById('node-' + node.id);
+    if (!el) continue;
+    el.className = el.className.replace(/\s*s-\w+/g, '');
+  }
+  // Reset arrows (applyStep)
+  const svg = document.getElementById('arrows-svg');
+  svg.querySelectorAll('.ap').forEach(p => {
+    p.setAttribute('class', 'ap');
+    p.setAttribute('marker-end', 'url(#mdef)');
+  });
+
+  // Replay all steps up to idx to set proper arrow/node states
+  for (let si = 0; si < idx; si++) {
+    const s = simSteps[si];
+    const ni = currentPath.findIndex(n => n.id === s.nodeId);
+    if (ni >= 0 && ni + 1 < currentPath.length) {
+      const nxt = currentPath[ni + 1];
+      const isDropped = (s.type === 'chain' && (s.verdict === 'DROP' || s.verdict === 'REJECT'));
+      setArrowState(currentPath[ni], nxt, isDropped ? 'drop' : 'pass');
+    }
+    markNodeDone(s);
+  }
+
+  // Current step
+  const step2 = simSteps[idx];
+  highlightCurrentStep(step2, idx);
+  updateInfoPanel(step2, idx);
+  moveDot(step2);
+
+  // Update controls
+  document.getElementById('btn-back').disabled = (idx <= 0);
+  document.getElementById('btn-step').disabled = (idx >= simSteps.length - 1);
+}
+
+function markNodeDone(step) {
+  const el = document.getElementById('node-' + step.nodeId);
+  if (!el) return;
+  el.className = el.className.replace(/\s*s-\w+/g, '');
+  if (step.type === 'chain' && step.provided !== false) {
+    const v = step.verdict || '';
+    if (v === 'DROP' || v === 'REJECT') el.classList.add('s-drop');
+    else el.classList.add('s-pass');
+  }
+}
+
+function highlightCurrentStep(step, idx) {
+  const el = document.getElementById('node-' + step.nodeId);
+  if (!el) return;
+  el.className = el.className.replace(/\s*s-\w+/g, '');
+  el.classList.add('s-checking');
+
+  // For chain steps, expand and show rule results
+  if (step.type === 'chain' && step.provided !== false && step.ruleResults) {
+    const node = currentPath.find(n => n.id === step.nodeId);
+    if (node) {
+      // Check if all rules are 'unvisited' (animation hasn't played yet) or we're showing state
+      el.classList.add('expanded');
+      const btn = el.querySelector('.nc-exp');
+      if (btn) btn.textContent = '▲';
+      renderRuleList(node, currentTables, step.ruleResults, step.matchedIdx);
+
+      // Auto-expand on DROP/REJECT and scroll to hit rule
+      if (step.verdict === 'DROP' || step.verdict === 'REJECT') {
+        el.classList.remove('s-checking');
+        el.classList.add('s-drop');
+        if (step.matchedIdx >= 0) {
+          setTimeout(() => {
+            const ruleEl = document.getElementById(`rule-${node.id}-${step.matchedIdx}`);
+            if (ruleEl) ruleEl.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+          }, 100); // allow DOM expansion to settle before scrolling
+        }
+      }
+    }
+  }
+
+  // Show custom chain steps inline
+  if (step.type === 'chain' && step.customChainSteps && step.customChainSteps.length) {
+    for (const cs of step.customChainSteps) {
+      renderCustomChainInNode(step, cs);
+    }
+  }
+}
+
+function renderCustomChainInNode(parentStep, customStep) {
+  const node = currentPath.find(n => n.id === parentStep.nodeId);
+  if (!node) return;
+  const container = document.getElementById('rules-' + node.id);
+  if (!container) return;
+
+  // Add a separator
+  const sep = document.createElement('div');
+  sep.style.cssText = 'padding:2px 7px;font-size:9px;color:#58a6ff;background:#0d1117;border-bottom:1px solid #30363d;';
+  sep.textContent = '↪ ' + customStep.chain;
+  container.appendChild(sep);
+
+  const tData = currentTables[customStep.table];
+  const cData = tData && tData.chains[customStep.chain];
+  if (!cData) return;
+
+  for (let i = 0; i < cData.rules.length; i++) {
+    const rule = cData.rules[i];
+    const status = customStep.ruleResults[i] || 'unvisited';
+    const ri = document.createElement('div');
+    ri.className = 'ri';
+    ri.style.paddingLeft = '14px';
+
+    const rs = document.createElement('span');
+    rs.className = 'rs';
+    const rt2 = document.createElement('span');
+    rt2.className = 'rt2';
+    rt2.textContent = rule.rawText.replace(/^-[AI]\s+\S+\s+/, '').trim();
+
+    if (status === 'skipped') { ri.classList.add('r-skip'); rs.textContent = '✅'; }
+    else if (status === 'matched') {
+      const t = rule.target;
+      if (t === 'DROP' || t === 'REJECT') { ri.classList.add('r-drop'); rs.textContent = '⛔'; }
+      else { ri.classList.add('r-hit'); rs.textContent = '✅'; }
+    } else if (status === 'unreached') { ri.classList.add('r-gray'); rs.textContent = '⚪'; }
+    else { rs.textContent = '·'; }
+
+    ri.appendChild(rs);
+    ri.appendChild(rt2);
+    container.appendChild(ri);
+  }
+}
+
+function updateInfoPanel(step, idx) {
+  const nodeEl = document.getElementById('i-node');
+  const desc = document.getElementById('i-desc');
+  const ruleEl = document.getElementById('i-rule');
+  const vdEl = document.getElementById('i-verdict');
+  vdEl.className = 'iv';
+
+  if (step.type === 'ep') {
+    nodeEl.textContent = step.label || '端点';
+    desc.textContent = step.label && step.label.includes('网络') ? '数据包从网络进入/离开。' : '数据包到达本地进程或由本地进程发出。';
+    ruleEl.textContent = '-';
+    vdEl.textContent = '-';
+    return;
+  }
+  if (step.type === 'rt') {
+    nodeEl.textContent = '路由决策';
+    desc.textContent = '内核查路由表，判断发往本机 (→INPUT) 还是转发 (→FORWARD)。';
+    ruleEl.textContent = '-';
+    vdEl.textContent = '-';
+    return;
+  }
+  // chain step
+  const key = `${step.table}/${step.chain}`;
+  nodeEl.textContent = key;
+  desc.textContent = CHAIN_DESC[key] || `${step.table} 表 ${step.chain} 链处理。`;
+
+  if (!step.provided) {
+    ruleEl.textContent = '-';
+    vdEl.textContent = '未提供规则';
+    return;
+  }
+
+  const tData = currentTables[step.table];
+  const cData = tData && tData.chains[step.chain];
+  const v = step.verdict || '';
+
+  if (step.matchedIdx >= 0 && cData) {
+    ruleEl.textContent = cData.rules[step.matchedIdx].rawText;
+  } else {
+    ruleEl.textContent = '-';
+  }
+
+  if (v === 'DROP') { vdEl.textContent = '🚫 DROP'; vdEl.classList.add('v-drop'); }
+  else if (v === 'REJECT') { vdEl.textContent = '🚫 REJECT'; vdEl.classList.add('v-reject'); }
+  else if (v === 'ACCEPT' || v.startsWith('POLICY:ACCEPT')) { vdEl.textContent = '✅ ACCEPT'; vdEl.classList.add('v-accept'); }
+  else if (v.startsWith('POLICY:')) { vdEl.textContent = v.replace('POLICY:', 'policy: '); }
+  else { vdEl.textContent = v || '-'; }
+}
+
+function moveDot(step) {
+  const dot = document.getElementById('pdot');
+  const node = currentPath.find(n => n.id === step.nodeId);
+  if (!node) return;
+
+  const cx = nodeCX(node);
+  const cy = nodeCY(node);
+  dot.style.display = 'block';
+  dot.className = '';
+
+  const v = step.verdict || '';
+  if (v === 'DROP' || v === 'REJECT') {
+    dot.classList.add('p-drop');
+  } else if (v === 'ACCEPT' || v.startsWith('POLICY:ACCEPT')) {
+    dot.classList.add('p-accept');
+  }
+
+  dot.style.left = cx + 'px';
+  dot.style.top = cy + 'px';
+}
+
+// ═══════════════════════════════════════════════════════════════════
+// PLAYBACK CONTROLLER
+// ═══════════════════════════════════════════════════════════════════
+function startSim() {
+  stopPlay();
+  const rulesText = document.getElementById('rules-textarea').value;
+  const tables = parseRules(rulesText);
+  const pkt = {
+    proto: document.getElementById('pkt-proto').value.trim().toLowerCase() || null,
+    srcIP: document.getElementById('pkt-src-ip').value.trim() || null,
+    dstIP: document.getElementById('pkt-dst-ip').value.trim() || null,
+    sport: parseInt(document.getElementById('pkt-sport').value, 10) || null,
+    dport: parseInt(document.getElementById('pkt-dport').value, 10) || null,
+  };
+  const dir = document.getElementById('pkt-dir').value;
+
+  buildLayout(dir, tables);
+  simSteps = simulate(tables, pkt, dir);
+  currentStepIdx = -1;
+
+  resetViz();
+  document.getElementById('btn-step').disabled = false;
+  document.getElementById('btn-play').disabled = false;
+}
+
+function stopPlay() {
+  if (playTimer) { clearTimeout(playTimer); playTimer = null; }
+  document.getElementById('btn-play').style.display = '';
+  document.getElementById('btn-pause').style.display = 'none';
+}
+
+function playNext() {
+  if (currentStepIdx >= simSteps.length - 1) { stopPlay(); return; }
+  applyStep(currentStepIdx + 1);
+
+  // Highlight arrows coming into next node
+  const ni = currentStepIdx;
+  if (ni > 0) {
+    const prev = currentPath.findIndex(n => n.id === simSteps[ni - 1].nodeId);
+    const cur = currentPath.findIndex(n => n.id === simSteps[ni].nodeId);
+    if (prev >= 0 && cur >= 0) {
+      const step = simSteps[ni - 1];
+      const isDropped = (step.type === 'chain' && (step.verdict === 'DROP' || step.verdict === 'REJECT'));
+      setArrowState(currentPath[prev], currentPath[cur], isDropped ? 'drop' : 'active');
+    }
+  }
+
+  if (currentStepIdx < simSteps.length - 1) {
+    playTimer = setTimeout(playNext, SPEEDS[speedIdx].ms);
+  } else {
+    stopPlay();
+    // Final arrow state
+    const last = simSteps[simSteps.length - 1];
+    const li = currentPath.findIndex(n => n.id === last.nodeId);
+    if (li > 0) {
+      const isDropped = (last.type === 'chain' && (last.verdict === 'DROP' || last.verdict === 'REJECT'));
+      setArrowState(currentPath[li - 1], currentPath[li], isDropped ? 'drop' : 'pass');
+    }
+  }
+}
+
+// ═══════════════════════════════════════════════════════════════════
+// INIT
+// ═══════════════════════════════════════════════════════════════════
+document.getElementById('start-btn').addEventListener('click', startSim);
+
+document.getElementById('btn-play').addEventListener('click', () => {
+  if (!simSteps.length) { startSim(); return; }
+  if (currentStepIdx >= simSteps.length - 1) { applyStep(0); }
+  document.getElementById('btn-play').style.display = 'none';
+  document.getElementById('btn-pause').style.display = '';
+  playTimer = setTimeout(playNext, 300);
+});
+
+document.getElementById('btn-pause').addEventListener('click', stopPlay);
+
+document.getElementById('btn-step').addEventListener('click', () => {
+  stopPlay();
+  if (!simSteps.length) { startSim(); return; }
+  applyStep(Math.max(0, currentStepIdx + 1));
+  // Arrow from prev to current
+  if (currentStepIdx > 0) {
+    const pi = currentPath.findIndex(n => n.id === simSteps[currentStepIdx - 1].nodeId);
+    const ci = currentPath.findIndex(n => n.id === simSteps[currentStepIdx].nodeId);
+    if (pi >= 0 && ci >= 0) {
+      const step = simSteps[currentStepIdx - 1];
+      const isDropped = (step.type === 'chain' && (step.verdict === 'DROP' || step.verdict === 'REJECT'));
+      setArrowState(currentPath[pi], currentPath[ci], isDropped ? 'drop' : 'pass');
+    }
+  }
+});
+
+document.getElementById('btn-back').addEventListener('click', () => {
+  stopPlay();
+  if (currentStepIdx > 0) applyStep(currentStepIdx - 1);
+});
+
+document.getElementById('btn-reset').addEventListener('click', () => {
+  stopPlay();
+  currentStepIdx = -1;
+  resetViz();
+  document.getElementById('btn-back').disabled = true;
+  document.getElementById('btn-step').disabled = !simSteps.length;
+});
+
+document.getElementById('speed-btn').addEventListener('click', () => {
+  speedIdx = (speedIdx + 1) % SPEEDS.length;
+  document.getElementById('speed-btn').textContent = SPEEDS[speedIdx].label;
+});
+
+// Pre-fill sample data and auto-build layout on load
+window.addEventListener('DOMContentLoaded', () => {
+  document.getElementById('rules-textarea').value = SAMPLE_RULES;
+  // Build initial layout without simulation
+  const dir = document.getElementById('pkt-dir').value;
+  buildLayout(dir, parseRules(SAMPLE_RULES));
+});
+
+// Rebuild layout on direction change
+document.getElementById('pkt-dir').addEventListener('change', () => {
+  stopPlay();
+  const dir = document.getElementById('pkt-dir').value;
+  const tables = parseRules(document.getElementById('rules-textarea').value);
+  buildLayout(dir, tables);
+  simSteps = [];
+  currentStepIdx = -1;
+  resetViz();
+});
+</script>
+</body>
+</html>
