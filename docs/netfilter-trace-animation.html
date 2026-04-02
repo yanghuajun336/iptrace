@@ -775,8 +775,8 @@ class AnimCtrl{
   arrowActive(i,cls){
     const p=document.querySelector(`[data-ai="${i}"]`);
     const f=document.querySelector(`[data-fi="${i}"]`);
-    if(p){p.className='apath '+cls;p.setAttribute('marker-end',`url(#ah${cls==='done'?'-g':cls==='active'?'-b':''})`);}
-    if(f){f.className='aflw'+(cls==='active'?' on':'');}
+    if(p){p.setAttribute('class', 'apath '+cls);p.setAttribute('marker-end',`url(#ah${cls==='done'?'-g':cls==='active'?'-b':''})`);}
+    if(f){f.setAttribute('class', 'aflw'+(cls==='active'?' on':''));}
   }
   nodeState(nk,state){
     const el=document.querySelector(`[data-nk="${nk}"]`);
@@ -1019,11 +1019,10 @@ function doStartTrace(){
   document.querySelectorAll('.cnode').forEach(el=>el.classList.remove('s-active','s-pass','s-drop'));
   document.querySelectorAll('.ri').forEach(el=>el.classList.remove('r-chk','r-skip','r-hit','vdrop',
     'vaccept','vreject','r-warn','r-gray'));
-  document.querySelectorAll('.apath').forEach(el=>{el.className='apath';
+  document.querySelectorAll('.apath').forEach(el=>{el.setAttribute('class', 'apath');
     el.setAttribute('marker-end','url(#ah)');});
-  document.querySelectorAll('.aflw').forEach(el=>el.className='aflw');
+  document.querySelectorAll('.aflw').forEach(el=>el.setAttribute('class', 'aflw'));
   document.getElementById('dot').className='';
-  document.getElementById('ptc').innerHTML='';
   // Re-simulate
   const sim=simulate(parsed.tables,parsed.policies,pkt.pkt,pkt.pkt.direction);
   layout=computeLayout(sim.steps);
@@ -1048,9 +1047,9 @@ function doReset(){
   document.querySelectorAll('.cnode').forEach(el=>el.classList.remove('s-active','s-pass','s-drop'));
   document.querySelectorAll('.ri').forEach(el=>el.classList.remove('r-chk','r-skip','r-hit',
     'vdrop','vaccept','vreject','r-warn','r-gray'));
-  document.querySelectorAll('.apath').forEach(el=>{el.className='apath';
+  document.querySelectorAll('.apath').forEach(el=>{el.setAttribute('class', 'apath');
     el.setAttribute('marker-end','url(#ah)');});
-  document.querySelectorAll('.aflw').forEach(el=>el.className='aflw');
+  document.querySelectorAll('.aflw').forEach(el=>el.setAttribute('class', 'aflw'));
   document.getElementById('info-ct').innerHTML=
     '<div class="il"><span class="il-lbl">就绪</span><span class="il-val">点击「开始追踪」</span></div>';
   document.getElementById('btn-trace').textContent='▶ 开始追踪';
