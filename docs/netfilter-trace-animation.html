@@ -1,0 +1,1488 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Netfilter Packet Trace Visualizer</title>
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+:root{
+  --bg:#0d1117;--bg2:#161b22;--bg3:#21262d;
+  --bd:#30363d;--t1:#e6edf3;--t2:#8b949e;--t3:#6e7681;
+  --blue:#58a6ff;--green:#3fb950;--red:#f85149;
+  --orange:#d29922;--purple:#bc8cff;--yellow:#e3b341;
+  --raw:#7c3aed;--mangle:#059669;--nat:#d97706;--filter:#2563eb;--security:#6b7280;
+}
+html,body{height:100%;overflow:hidden;background:var(--bg);color:var(--t1);
+  font-family:-apple-system,BlinkMacSystemFont,'Segoe UI','PingFang SC','Microsoft YaHei',sans-serif;
+  font-size:14px;min-width:1280px;display:flex;flex-direction:column}
+
+/* ─── INPUT SECTION ─── */
+#inp{background:var(--bg2);border-bottom:1px solid var(--bd);flex-shrink:0}
+#inp-bar{display:flex;justify-content:space-between;align-items:center;
+  padding:6px 16px;border-bottom:1px solid var(--bd)}
+#inp-bar-title{font-size:11px;font-weight:700;color:var(--t3);text-transform:uppercase;letter-spacing:.07em}
+#inp-toggle{background:none;border:1px solid var(--bd);border-radius:4px;color:var(--t2);
+  font-size:11px;cursor:pointer;padding:2px 10px}
+#inp-toggle:hover{color:var(--t1)}
+#inp-body{display:flex;gap:16px;padding:10px 16px 12px;overflow:hidden;
+  transition:max-height .3s ease,padding .3s ease;max-height:300px}
+#inp.collapsed #inp-body{max-height:0;padding-top:0;padding-bottom:0;overflow:hidden}
+
+#rules-col{flex:1;min-width:300px;display:flex;flex-direction:column;gap:6px}
+.sec-lbl{font-size:11px;font-weight:700;color:var(--t3);text-transform:uppercase;letter-spacing:.06em}
+.rules-hdr{display:flex;justify-content:space-between;align-items:center}
+#rules-ta{width:100%;min-height:126px;max-height:144px;background:var(--bg3);border:1px solid var(--bd);
+  border-radius:6px;color:var(--t1);font-family:'JetBrains Mono','Fira Code',Consolas,monospace;
+  font-size:11px;padding:8px 10px;resize:vertical;outline:none;line-height:1.5}
+#rules-ta:focus{border-color:var(--blue);box-shadow:0 0 0 2px rgba(88,166,255,.15)}
+#btn-parse{background:var(--purple);color:#fff;border:none;border-radius:6px;
+  padding:7px 16px;font-size:13px;font-weight:600;cursor:pointer;white-space:nowrap;
+  transition:opacity .15s,box-shadow .15s}
+#btn-parse:hover{opacity:.88;box-shadow:0 0 10px rgba(188,140,255,.4)}
+
+#pkt-col{width:450px;flex-shrink:0;display:flex;flex-direction:column;gap:8px}
+.frow{display:flex;gap:10px}
+.fgrp{flex:1;display:flex;flex-direction:column;gap:3px}
+.fgrp label{font-size:11px;font-weight:500;color:var(--t2)}
+.fgrp input,.fgrp select{background:var(--bg3);border:1px solid var(--bd);border-radius:5px;
+  color:var(--t1);font-size:13px;padding:5px 8px;outline:none;width:100%}
+.fgrp input:focus,.fgrp select:focus{border-color:var(--blue)}
+.fgrp input.inv{border-color:var(--red)}
+
+/* ─── MODULE PARAMS ─── */
+#mod-col{min-width:280px;flex:1;display:flex;flex-direction:column;gap:6px;max-height:278px}
+.mod-hdr{display:flex;justify-content:space-between;align-items:center;flex-shrink:0}
+#mod-add-sel{background:var(--bg3);border:1px solid var(--bd);border-radius:5px;
+  color:var(--blue);font-size:11px;padding:3px 8px;cursor:pointer;outline:none}
+#mod-add-sel:focus{border-color:var(--blue)}
+#mod-rows{display:flex;flex-direction:column;gap:5px;overflow-y:auto;flex:1}
+#mod-rows::-webkit-scrollbar{width:4px}
+#mod-rows::-webkit-scrollbar-thumb{background:var(--bd);border-radius:2px}
+.mod-hint{font-size:11px;color:var(--t3);padding:6px 4px;font-style:italic}
+.mod-row{display:flex;align-items:center;gap:6px;flex-wrap:wrap;
+  background:var(--bg3);border:1px solid var(--bd);border-radius:6px;padding:5px 8px}
+.mod-label{font-size:11px;font-weight:600;color:var(--t2);min-width:68px;flex-shrink:0}
+.mod-inp{background:var(--bg);border:1px solid var(--bd);border-radius:4px;
+  color:var(--t1);font-size:12px;padding:3px 6px;outline:none;width:110px}
+.mod-inp.wide{width:160px}
+.mod-inp:focus{border-color:var(--blue)}
+.mod-sel{background:var(--bg);border:1px solid var(--bd);border-radius:4px;
+  color:var(--t1);font-size:12px;padding:3px 5px;outline:none}
+.mod-sel:focus{border-color:var(--blue)}
+.mod-rm{background:none;border:1px solid var(--bd);border-radius:4px;color:var(--red);
+  font-size:14px;cursor:pointer;padding:0 5px;line-height:1.4;flex-shrink:0;margin-left:auto}
+.mod-rm:hover{background:rgba(248,81,73,.12)}
+.mod-tcpf{display:flex;gap:10px;flex-wrap:wrap;align-items:flex-start}
+.mod-tcpf-grp{display:flex;align-items:center;gap:4px;flex-wrap:wrap}
+.mod-tcpf-lbl{font-size:10px;color:var(--t3);font-weight:700;flex-shrink:0;margin-right:2px}
+.mod-tcpf-grp label{display:flex;align-items:center;gap:2px;font-size:11px;
+  color:var(--t2);cursor:pointer;white-space:nowrap}
+.mod-tcpf-grp input[type=checkbox]{accent-color:var(--blue);width:12px;height:12px;cursor:pointer}
+
+/* ─── CONTROL BAR ─── */
+#ctrl{background:var(--bg2);border-bottom:1px solid var(--bd);padding:7px 16px;
+  display:flex;align-items:center;gap:10px;flex-shrink:0}
+.cbtn{border:1px solid var(--bd);border-radius:6px;background:var(--bg3);color:var(--t1);
+  font-size:13px;font-weight:500;padding:5px 14px;cursor:pointer;transition:background .15s}
+.cbtn:hover{background:var(--bd)}
+.cbtn:disabled{opacity:.38;cursor:default}
+#btn-trace{background:var(--blue);border-color:var(--blue);color:#0d1117;font-weight:700}
+#btn-trace:hover{opacity:.88}
+#btn-trace:disabled{opacity:.38;background:var(--blue)}
+#parse-st{font-size:12px;color:var(--t3);margin-left:4px}
+#parse-st.ok{color:var(--green)}
+#parse-st.err{color:var(--red)}
+.spd-ctl{display:flex;align-items:center;gap:8px;margin-left:auto}
+.spd-ctl label{font-size:12px;color:var(--t2)}
+#spd-sl{width:90px;accent-color:var(--blue)}
+#spd-lbl{font-size:12px;color:var(--blue);min-width:38px}
+
+/* ─── VIZ WRAPPER ─── */
+#viz-wrap{flex:1;overflow:auto;position:relative;background:var(--bg)}
+#viz{position:relative;min-width:100%;min-height:100%}
+#asvg{position:absolute;top:0;left:0;pointer-events:none;overflow:visible}
+
+/* ─── NODE CARDS ─── */
+.cnode{position:absolute;width:168px;background:var(--bg2);border:2px solid var(--bd);
+  border-radius:10px;cursor:pointer;user-select:none;z-index:2;overflow:hidden;
+  transition:border-color .25s,box-shadow .25s}
+.cnode.expanded{z-index:100;overflow:visible}
+.cnode.no-rules{cursor:default;opacity:.65}
+.cnode.ep,.cnode.rt{width:114px;cursor:default;background:var(--bg3);border-style:dashed}
+
+/* table colours */
+.t-raw{border-color:var(--raw)}.t-mangle{border-color:var(--mangle)}
+.t-nat{border-color:var(--nat)}.t-filter{border-color:var(--filter)}.t-security{border-color:var(--security)}
+
+/* states */
+.cnode.s-active{border-color:var(--blue)!important;
+  box-shadow:0 0 0 3px rgba(88,166,255,.28),0 0 22px rgba(88,166,255,.18)}
+.cnode.s-pass{border-color:var(--green)!important;
+  box-shadow:0 0 0 2px rgba(63,185,80,.22),0 0 14px rgba(63,185,80,.12)}
+.cnode.s-drop{border-color:var(--red)!important;
+  box-shadow:0 0 0 3px rgba(248,81,73,.4),0 0 24px rgba(248,81,73,.25);
+  animation:pulseRed .45s ease 3}
+@keyframes pulseRed{
+  0%,100%{box-shadow:0 0 0 3px rgba(248,81,73,.4),0 0 24px rgba(248,81,73,.25)}
+  50%{box-shadow:0 0 0 7px rgba(248,81,73,.6),0 0 40px rgba(248,81,73,.55)}}
+
+.nh{padding:8px 10px;display:flex;flex-direction:column;gap:2px}
+.nt{font-size:10px;font-weight:700;color:var(--t3);text-transform:uppercase;letter-spacing:.05em}
+.nc{font-size:14px;font-weight:700;color:var(--t1);display:flex;justify-content:space-between;align-items:center}
+.ncr{display:flex;align-items:center;gap:5px}
+.nc-cnt{font-size:10px;color:var(--t3);padding:1px 5px;background:var(--bg3);border-radius:8px}
+.nc-exp{font-size:11px;color:var(--blue);transition:transform .3s}
+.cnode.expanded .nc-exp{transform:rotate(180deg)}
+.nm{display:flex;justify-content:space-between;margin-top:2px}
+.np{font-size:10px;color:var(--t2)}.nk{font-size:10px;color:var(--t3)}
+.cnode.ep .nc,.cnode.rt .nc{font-size:12px;color:var(--t2);justify-content:center;font-weight:600}
+.cnode.ep .nh,.cnode.rt .nh{padding:10px;text-align:center}
+.ep-sub,.rt-sub{font-size:10px;color:var(--t3);margin-top:2px}
+
+/* rule list */
+.nrules{max-height:0;overflow:hidden;transition:max-height .3s ease;border-top:0 solid var(--bd)}
+.cnode.expanded .nrules{max-height:220px;overflow-y:auto;border-top-width:1px}
+.nrules::-webkit-scrollbar{width:4px}
+.nrules::-webkit-scrollbar-track{background:var(--bg3)}
+.nrules::-webkit-scrollbar-thumb{background:var(--bd);border-radius:2px}
+
+.ri{padding:4px 8px;font-size:12px;font-family:'JetBrains Mono','Fira Code',Consolas,monospace;
+  border-bottom:1px solid var(--bg3);display:flex;align-items:flex-start;gap:5px;
+  line-height:1.5;transition:background .15s;position:relative}
+.ri:last-child{border-bottom:none}
+.ri:hover{background:rgba(255,255,255,.03)}
+.ri.sub{padding-left:22px;background:rgba(88,166,255,.03)}
+.ri[data-raw]{cursor:pointer}
+.ri[data-raw]:hover{background:rgba(255,255,255,.05)}
+.ri[data-raw]:after{content:'\1F4CB';opacity:0;position:absolute;right:6px;top:50%;
+  transform:translateY(-50%);font-size:11px;transition:opacity .15s;pointer-events:none}
+.ri[data-raw]:hover:after{opacity:.55}
+.ri.copied{background:rgba(63,185,80,.15)!important}
+.rs{font-size:13px;flex-shrink:0;line-height:1.5;min-width:14px}
+.rt2{color:var(--t3);word-break:break-all;flex:1;font-size:12px}
+.ri.r-chk{background:rgba(88,166,255,.1)}.ri.r-chk .rt2{color:var(--blue)}
+.ri.r-skip .rt2{color:var(--green)}
+.ri.r-hit .rt2{color:var(--t1);font-weight:600}
+.ri.vdrop .rt2{color:var(--red);font-weight:600}
+.ri.vaccept .rt2{color:var(--green);font-weight:600}
+.ri.vreject .rt2{color:var(--orange);font-weight:600}
+.ri.r-warn .rt2{color:var(--yellow)}
+.ri.r-gray{opacity:.38}.ri.r-gray .rt2{color:var(--t3)}
+
+/* ─── PACKET DOT ─── */
+#dot{position:absolute;width:18px;height:18px;border-radius:50%;z-index:10;
+  pointer-events:none;display:none;transform:translate(-50%,-50%);
+  background:radial-gradient(circle at 35% 35%,#a8d8ff,var(--blue));
+  box-shadow:0 0 8px rgba(88,166,255,.9),0 0 22px rgba(88,166,255,.45)}
+#dot.moving{box-shadow:0 0 8px rgba(88,166,255,.9),0 0 22px rgba(88,166,255,.5),
+  6px 0 18px rgba(88,166,255,.25),12px 0 28px rgba(88,166,255,.1)}
+#dot.vdrop{background:radial-gradient(circle at 35% 35%,#ffaaaa,var(--red));
+  box-shadow:0 0 8px rgba(248,81,73,.9),0 0 22px rgba(248,81,73,.45)}
+#dot.vaccept{background:radial-gradient(circle at 35% 35%,#aaffbb,var(--green));
+  box-shadow:0 0 8px rgba(63,185,80,.9),0 0 22px rgba(63,185,80,.45)}
+
+/* ─── PARTICLES ─── */
+#ptc{position:absolute;top:0;left:0;pointer-events:none;z-index:15}
+.ptc{position:absolute;width:8px;height:8px;border-radius:50%;background:var(--red);
+  transform:translate(-50%,-50%);animation:ptcfly .75s ease-out forwards}
+@keyframes ptcfly{
+  0%{transform:translate(-50%,-50%) scale(1.2);opacity:1}
+  100%{transform:translate(calc(-50% + var(--dx)),calc(-50% + var(--dy))) scale(.08);opacity:0}}
+
+/* ─── SVG ARROWS ─── */
+.apath{fill:none;stroke:var(--bd);stroke-width:2;transition:stroke .3s}
+.apath.active{stroke:var(--blue)}
+.apath.done{stroke:var(--green)}
+.aflw{fill:none;stroke:var(--blue);stroke-width:2;stroke-dasharray:8 6;opacity:0;
+  pointer-events:none;transition:opacity 0.2s}
+.aflw.on{opacity:1;animation:fdash .55s linear infinite}
+@keyframes fdash{from{stroke-dashoffset:14}to{stroke-dashoffset:0}}
+
+/* ─── INFO PANEL ─── */
+#info{background:var(--bg2);border-top:1px solid var(--bd);padding:10px 16px;
+  min-height:82px;max-height:130px;overflow-y:auto;flex-shrink:0}
+#info::-webkit-scrollbar{width:4px}
+#info::-webkit-scrollbar-thumb{background:var(--bd)}
+#info-ct{font-size:13px;color:var(--t2);line-height:1.75}
+.il{display:flex;align-items:baseline;gap:6px;flex-wrap:wrap}
+.il-lbl{font-size:10px;font-weight:700;color:var(--t3);text-transform:uppercase;
+  letter-spacing:.04em;min-width:68px}
+.il-val{font-family:'JetBrains Mono',Consolas,monospace;font-size:12px;color:var(--t1)}
+.vbadge{display:inline-block;padding:2px 8px;border-radius:4px;font-size:12px;font-weight:700}
+.vbadge.drop{background:rgba(248,81,73,.2);color:var(--red)}
+.vbadge.accept{background:rgba(63,185,80,.2);color:var(--green)}
+.vbadge.reject{background:rgba(210,153,34,.2);color:var(--orange)}
+.vbadge.pass{background:rgba(88,166,255,.1);color:var(--blue)}
+
+/* ─── EMPTY STATE ─── */
+#empty{position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);
+  text-align:center;color:var(--t3);pointer-events:none}
+#empty .e1{font-size:36px;margin-bottom:10px}
+#empty .e2{font-size:15px}
+</style>
+</head>
+<body>
+
+<!-- INPUT SECTION -->
+<div id="inp">
+  <div id="inp-bar">
+    <span id="inp-bar-title">规则 &amp; 数据包参数</span>
+    <button id="inp-toggle" onclick="toggleInp()">&#9650; 收起</button>
+  </div>
+  <div id="inp-body">
+    <div id="rules-col">
+      <div class="rules-hdr">
+        <span class="sec-lbl">iptables 规则</span>
+        <button id="btn-parse" onclick="doParseRules()">解析规则</button>
+      </div>
+      <textarea id="rules-ta" spellcheck="false"></textarea>
+    </div>
+    <div id="pkt-col">
+      <span class="sec-lbl">数据包参数</span>
+      <div class="frow">
+        <div class="fgrp"><label>源地址 (src) *</label>
+          <input type="text" id="f-src" value="8.82.191.80" placeholder="1.2.3.4"></div>
+        <div class="fgrp"><label>目的地址 (dst) *</label>
+          <input type="text" id="f-dst" value="76.53.221.233" placeholder="10.0.0.1"></div>
+      </div>
+      <div class="frow">
+        <div class="fgrp"><label>协议 (proto) *</label>
+          <select id="f-proto">
+            <option value="tcp" selected>tcp</option>
+            <option value="udp">udp</option>
+            <option value="icmp">icmp</option>
+          </select></div>
+        <div class="fgrp"><label>目的端口 (dport)</label>
+          <input type="number" id="f-dport" value="8090" placeholder="80"></div>
+        <div class="fgrp"><label>源端口 (sport)</label>
+          <input type="number" id="f-sport" value="" placeholder="可选"></div>
+      </div>
+      <div class="frow">
+        <div class="fgrp"><label>方向 (direction) *</label>
+          <select id="f-dir">
+            <option value="inbound" selected>入站 (inbound)</option>
+            <option value="outbound">出站 (outbound)</option>
+            <option value="forward">转发 (forward)</option>
+          </select></div>
+        <div class="fgrp"><label>连接状态</label>
+          <select id="f-state">
+            <option value="NEW" selected>NEW</option>
+            <option value="ESTABLISHED">ESTABLISHED</option>
+            <option value="RELATED">RELATED</option>
+            <option value="INVALID">INVALID</option>
+          </select></div>
+      </div>
+      <div class="frow">
+        <div class="fgrp"><label>入接口 (iface_in)</label>
+          <input type="text" id="f-iin" value="" placeholder="eth0, lo …"></div>
+        <div class="fgrp"><label>出接口 (iface_out)</label>
+          <input type="text" id="f-iout" value="" placeholder="eth0 …"></div>
+      </div>
+    </div>
+    <div id="mod-col">
+      <div class="mod-hdr">
+        <span class="sec-lbl">模块匹配条件</span>
+        <select id="mod-add-sel" onchange="addModule(this.value);this.value=''">
+          <option value="">+ 添加模块</option>
+          <option value="tcp-flags">TCP Flags</option>
+          <option value="icmp-type">ICMP Type</option>
+          <option value="mac-src">源 MAC</option>
+          <option value="mark">Mark</option>
+          <option value="tos">TOS</option>
+          <option value="ttl">TTL</option>
+          <option value="pkttype">包类型</option>
+          <option value="iprange-src">源 IP 范围</option>
+          <option value="iprange-dst">目的 IP 范围</option>
+          <option value="connlimit">连接数 &gt;</option>
+          <option value="owner-uid">UID</option>
+          <option value="string">字符串</option>
+          <option value="length">包长度</option>
+          <option value="physdev-in">物理入接口</option>
+          <option value="ipset">IP Set</option>
+        </select>
+      </div>
+      <div id="mod-rows">
+        <div class="mod-hint" id="mod-hint">暂无模块条件，从上方「添加模块」</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- CONTROL BAR -->
+<div id="ctrl">
+  <button class="cbtn" id="btn-trace" onclick="doStartTrace()" disabled>&#9654; 开始追踪</button>
+  <button class="cbtn" id="btn-pause" onclick="doPause()" disabled>&#9208; 暂停</button>
+  <button class="cbtn" id="btn-reset" onclick="doReset()" disabled>&#8634; 重置</button>
+  <span id="parse-st"></span>
+  <div class="spd-ctl">
+    <label>速度:</label>
+    <input type="range" id="spd-sl" min="0" max="2" value="1" oninput="setSpeed(+this.value)">
+    <span id="spd-lbl">普通</span>
+  </div>
+</div>
+
+<!-- VIZ CANVAS -->
+<div id="viz-wrap">
+  <div id="viz">
+    <svg id="asvg"></svg>
+    <div id="empty"><div class="e1">&#128230;</div><div class="e2">请先输入规则并点击「解析规则」</div></div>
+  </div>
+  <div id="dot"></div>
+  <div id="ptc"></div>
+</div>
+
+<!-- INFO PANEL -->
+<div id="info"><div id="info-ct">等待解析规则…</div></div>
+
+<script>
+'use strict';
+
+// ═══════════════════════════════════════════════════════
+// CONSTANTS
+// ═══════════════════════════════════════════════════════
+
+const DEFAULT_RULES = `# Generated by iptables-save v1.8.7 on Thu Apr  2 10:45:11 2026
+*mangle
+:PREROUTING ACCEPT [835492:559187498]
+:INPUT ACCEPT [829498:558498498]
+:FORWARD ACCEPT [0:0]
+:OUTPUT ACCEPT [631498:98765432]
+:POSTROUTING ACCEPT [631498:98765432]
+COMMIT
+*raw
+:PREROUTING ACCEPT [835492:559187498]
+:OUTPUT ACCEPT [631498:98765432]
+-A PREROUTING -s 100.100.100.1/32 -j DROP
+-A OUTPUT -d 100.100.100.2/32 -j DROP
+-A OUTPUT -d 8.82.191.80/32 -p tcp -m tcp --sport 80 -j DROP
+COMMIT
+*nat
+:PREROUTING ACCEPT [5765:380580]
+:INPUT ACCEPT [5411:352836]
+:OUTPUT ACCEPT [3210:210600]
+:POSTROUTING ACCEPT [3210:210600]
+:DOCKER - [0:0]
+-A PREROUTING -m addrtype --dst-type LOCAL -j DOCKER
+-A OUTPUT ! -d 127.0.0.0/8 -m addrtype --dst-type LOCAL -j DOCKER
+-A POSTROUTING -s 172.17.0.0/16 ! -o docker0 -j MASQUERADE
+-A DOCKER -i docker0 -j RETURN
+COMMIT
+*filter
+:INPUT DROP [0:0]
+:FORWARD DROP [0:0]
+:OUTPUT ACCEPT [0:0]
+:DOCKER - [0:0]
+:DOCKER-ISOLATION-STAGE-1 - [0:0]
+:DOCKER-ISOLATION-STAGE-2 - [0:0]
+:DOCKER-USER - [0:0]
+:IPTRACE_TEST - [0:0]
+-A INPUT -m state --state RELATED,ESTABLISHED -j ACCEPT
+-A INPUT -p icmp -j ACCEPT
+-A INPUT -i lo -j ACCEPT
+-A INPUT -p tcp -m tcp --dport 22 -j ACCEPT
+-A INPUT -s 8.82.191.80/32 -p tcp -m tcp --dport 8001 -j DROP
+-A INPUT -s 8.82.191.80/32 -p tcp -m tcp --dport 8002 -j REJECT --reject-with tcp-reset
+-A INPUT -s 8.82.191.80/32 -p tcp -m tcp --dport 8003 -j DROP
+-A INPUT -s 8.82.191.80/32 -p udp -m udp --dport 8004 -j DROP
+-A INPUT -s 8.82.191.80/32 -p icmp -j DROP
+-A INPUT -s 8.82.191.80/32 -p tcp -m multiport --dports 8005,8006,8007 -j DROP
+-A INPUT -s 8.82.191.80/32 -p tcp -m tcp --dport 8008 -j ACCEPT
+-A INPUT -s 8.82.191.80/32 -p tcp -m tcp --dport 8090 -j DROP
+-A INPUT -s 8.82.191.80/32 -p tcp -m tcp --dport 7001 -j IPTRACE_TEST
+-A INPUT -p tcp -m tcp --dport 80 -j ACCEPT
+-A INPUT -p tcp -m tcp --dport 443 -j ACCEPT
+-A FORWARD -j DOCKER-USER
+-A FORWARD -j DOCKER-ISOLATION-STAGE-1
+-A FORWARD -o docker0 -m conntrack --ctstate RELATED,ESTABLISHED -j ACCEPT
+-A FORWARD -o docker0 -j DOCKER
+-A FORWARD -i docker0 ! -o docker0 -j ACCEPT
+-A FORWARD -i docker0 -o docker0 -j ACCEPT
+-A FORWARD -s 8.82.191.80/32 -j DROP
+-A OUTPUT -d 8.82.191.80/32 -p tcp -m tcp --sport 8010 -j DROP
+-A DOCKER-ISOLATION-STAGE-1 -i docker0 ! -o docker0 -j DOCKER-ISOLATION-STAGE-2
+-A DOCKER-ISOLATION-STAGE-1 -j RETURN
+-A DOCKER-ISOLATION-STAGE-2 -o docker0 -j DROP
+-A DOCKER-ISOLATION-STAGE-2 -j RETURN
+-A DOCKER-USER -j RETURN
+-A IPTRACE_TEST -p tcp -m tcp --dport 7001 -j DROP
+COMMIT`;
+
+const CHAIN_PATHS = {
+  inbound:[
+    {type:'ep',label:'NETWORK',sub:'incoming'},
+    {table:'raw',chain:'PREROUTING'},
+    {table:'mangle',chain:'PREROUTING'},
+    {table:'nat',chain:'PREROUTING'},
+    {type:'rt',label:'ROUTING',sub:'decision'},
+    {table:'mangle',chain:'INPUT'},
+    {table:'filter',chain:'INPUT'},
+    {table:'security',chain:'INPUT'},
+    {type:'ep',label:'LOCAL',sub:'process'},
+  ],
+  outbound:[
+    {type:'ep',label:'LOCAL',sub:'process'},
+    {table:'raw',chain:'OUTPUT'},
+    {table:'mangle',chain:'OUTPUT'},
+    {table:'nat',chain:'OUTPUT'},
+    {table:'filter',chain:'OUTPUT'},
+    {table:'security',chain:'OUTPUT'},
+    {type:'rt',label:'ROUTING',sub:'decision'},
+    {table:'mangle',chain:'POSTROUTING'},
+    {table:'nat',chain:'POSTROUTING'},
+    {type:'ep',label:'NETWORK',sub:'outgoing'},
+  ],
+  forward:[
+    {type:'ep',label:'NETWORK',sub:'incoming'},
+    {table:'raw',chain:'PREROUTING'},
+    {table:'mangle',chain:'PREROUTING'},
+    {table:'nat',chain:'PREROUTING'},
+    {type:'rt',label:'ROUTING',sub:'decision'},
+    {table:'mangle',chain:'FORWARD'},
+    {table:'filter',chain:'FORWARD'},
+    {table:'security',chain:'FORWARD'},
+    {table:'mangle',chain:'POSTROUTING'},
+    {table:'nat',chain:'POSTROUTING'},
+    {type:'ep',label:'NETWORK',sub:'outgoing'},
+  ],
+};
+
+const SPEED = {
+  0:{name:'慢速',ruleMs:950,nodeMs:1800,moveMs:650},
+  1:{name:'普通',ruleMs:260,nodeMs:700,moveMs:420},
+  2:{name:'快速',ruleMs:55,nodeMs:160,moveMs:200},
+};
+
+const TC = {raw:'var(--raw)',mangle:'var(--mangle)',nat:'var(--nat)',filter:'var(--filter)',security:'var(--security)'};
+
+// ═══════════════════════════════════════════════════════
+// STATE
+// ═══════════════════════════════════════════════════════
+let parsed = null;
+let layout = [];
+let anim = null;
+let curSpeed = 1;
+
+// ═══════════════════════════════════════════════════════
+// IP UTILITIES
+// ═══════════════════════════════════════════════════════
+function ip4ToU32(ip){
+  const p=ip.trim().split('.');
+  return(((+p[0])<<24)|(((+p[1])<<16))|(((+p[2])<<8))|((+p[3])))>>>0;
+}
+function cidrMask(bits){
+  if(bits<=0)return 0;
+  if(bits>=32)return 0xFFFFFFFF;
+  return((-1)<<(32-bits))>>>0;
+}
+function matchCIDR(pktIP,cidr){
+  if(!cidr)return true;
+  const sl=cidr.indexOf('/');
+  const net=sl>=0?cidr.slice(0,sl):cidr;
+  const bits=sl>=0?parseInt(cidr.slice(sl+1)):32;
+  if(bits===0)return true;
+  const mask=cidrMask(bits);
+  try{return(ip4ToU32(pktIP)&mask)===(ip4ToU32(net)&mask);}
+  catch(e){return false;}
+}
+function ipInRange(ip,start,end){
+  try{
+    const v=ip4ToU32(ip);
+    return v>=ip4ToU32(start)&&v<=ip4ToU32(end);
+  }catch(e){return false;}
+}
+
+// ═══════════════════════════════════════════════════════
+// PARSER
+// ═══════════════════════════════════════════════════════
+function tokenize(line){
+  const toks=[];let cur='';
+  for(let i=0;i<line.length;i++){
+    if(line[i]===' '||line[i]==='\t'){if(cur){toks.push(cur);cur='';}}
+    else{cur+=line[i];}
+  }
+  if(cur)toks.push(cur);
+  return toks;
+}
+
+function parseRule(line,table){
+  const toks=tokenize(line);
+  if(toks.length<3||toks[0]!=='-A')return null;
+  const r={raw:line,table,chain:toks[1],
+    src:null,srcNeg:false,dst:null,dstNeg:false,
+    proto:null,protoNeg:false,iIn:null,iInNeg:false,iOut:null,iOutNeg:false,
+    dport:null,sport:null,mportDports:null,mportSports:null,
+    stateList:null,ctstateList:null,addrtype:null,
+    connlimit:null,connlimitAbove:null,connlimitUpto:null,
+    owner:null,ownerUid:null,
+    icmpType:null,
+    tcpFlagsMask:null,tcpFlagsComp:null,
+    macSrc:null,
+    markVal:null,markMask:null,
+    tosVal:null,
+    ttlOp:null,ttlVal:null,
+    pktType:null,
+    srcRange:null,dstRange:null,
+    stringVal:null,stringAlgo:null,
+    lenMin:null,lenMax:null,
+    physdevIn:null,
+    setName:null,setDir:null,
+    target:null,rejectWith:null};
+  let i=2,neg=false;
+  while(i<toks.length){
+    const t=toks[i];
+    if(t==='!'){neg=true;i++;continue;}
+    switch(t){
+      case'-s':r.src=toks[++i];r.srcNeg=neg;neg=false;break;
+      case'-d':r.dst=toks[++i];r.dstNeg=neg;neg=false;break;
+      case'-p':r.proto=toks[++i].toLowerCase();r.protoNeg=neg;neg=false;break;
+      case'-i':r.iIn=toks[++i];r.iInNeg=neg;neg=false;break;
+      case'-o':r.iOut=toks[++i];r.iOutNeg=neg;neg=false;break;
+      case'-m':i++;neg=false;break;
+      case'--dport':r.dport=parseInt(toks[++i]);neg=false;break;
+      case'--sport':r.sport=parseInt(toks[++i]);neg=false;break;
+      case'--dports':r.mportDports=toks[++i].split(',').map(Number);neg=false;break;
+      case'--sports':r.mportSports=toks[++i].split(',').map(Number);neg=false;break;
+      case'--state':r.stateList=toks[++i].split(',');neg=false;break;
+      case'--ctstate':r.ctstateList=toks[++i].split(',');neg=false;break;
+      case'--dst-type':r.addrtype=toks[++i];neg=false;break;
+      case'--src-type':r.addrtypeSrc=toks[++i];neg=false;break;
+      case'--connlimit-above':{const v=toks[++i];r.connlimitAbove=v;r.connlimit=v;neg=false;break;}
+      case'--connlimit-upto':{const v=toks[++i];r.connlimitUpto=v;r.connlimit=v;neg=false;break;}
+      case'--uid-owner':{const v=toks[++i];r.ownerUid=v;r.owner=v;neg=false;break;}
+      case'--gid-owner':r.owner=toks[++i];neg=false;break;
+      case'--icmp-type':r.icmpType=toks[++i];neg=false;break;
+      case'--tcp-flags':{
+        r.tcpFlagsMask=(toks[++i]||'').split(',').map(s=>s.toUpperCase());
+        r.tcpFlagsComp=(toks[++i]||'').split(',').map(s=>s.toUpperCase());
+        neg=false;break;}
+      case'--syn':{
+        r.tcpFlagsMask=['SYN','RST','ACK','FIN'];r.tcpFlagsComp=['SYN'];neg=false;break;}
+      case'--mac-source':r.macSrc=toks[++i].toLowerCase();neg=false;break;
+      case'--mark':{
+        const mv=toks[++i];const sl2=mv.indexOf('/');
+        r.markVal=sl2>=0?mv.slice(0,sl2):mv;
+        r.markMask=sl2>=0?mv.slice(sl2+1):null;neg=false;break;}
+      case'--tos':r.tosVal=toks[++i];neg=false;break;
+      case'--ttl-eq':r.ttlOp='eq';r.ttlVal=parseInt(toks[++i]);neg=false;break;
+      case'--ttl-gt':r.ttlOp='gt';r.ttlVal=parseInt(toks[++i]);neg=false;break;
+      case'--ttl-lt':r.ttlOp='lt';r.ttlVal=parseInt(toks[++i]);neg=false;break;
+      case'--pkt-type':r.pktType=toks[++i].toUpperCase();neg=false;break;
+      case'--src-range':{
+        const sv=toks[++i];const di=sv.indexOf('-');
+        if(di>0)r.srcRange={start:sv.slice(0,di),end:sv.slice(di+1)};
+        neg=false;break;}
+      case'--dst-range':{
+        const dv=toks[++i];const di2=dv.indexOf('-');
+        if(di2>0)r.dstRange={start:dv.slice(0,di2),end:dv.slice(di2+1)};
+        neg=false;break;}
+      case'--string':r.stringVal=toks[++i];neg=false;break;
+      case'--algo':r.stringAlgo=toks[++i];neg=false;break;
+      case'--length':{
+        const lv=toks[++i];const co=lv.indexOf(':');
+        if(co>=0){r.lenMin=parseInt(lv.slice(0,co));r.lenMax=parseInt(lv.slice(co+1));}
+        else{r.lenMin=parseInt(lv);r.lenMax=parseInt(lv);}
+        neg=false;break;}
+      case'--physdev-in':r.physdevIn=toks[++i];neg=false;break;
+      case'--match-set':r.setName=toks[++i];r.setDir=(toks[i+1]||'src');i++;neg=false;break;
+      case'-j':r.target=toks[++i];neg=false;break;
+      case'--reject-with':r.rejectWith=toks[++i];neg=false;break;
+      default:neg=false;break;
+    }
+    i++;
+  }
+  return r;
+}
+
+function parseIptablesSave(text){
+  const tables={},policies={};
+  let tbl=null;
+  for(let raw of text.split('\n')){
+    const line=raw.trim();
+    if(!line||line.startsWith('#'))continue;
+    if(line.startsWith('*')){
+      tbl=line.slice(1).trim();
+      if(!tables[tbl])tables[tbl]={};
+      if(!policies[tbl])policies[tbl]={};
+      continue;
+    }
+    if(line==='COMMIT'){tbl=null;continue;}
+    if(!tbl)continue;
+    if(line.startsWith(':')){
+      const m=line.match(/^:(\S+)\s+(\S+)/);
+      if(m){
+        const ch=m[1],pol=m[2];
+        policies[tbl][ch]=pol;
+        if(!tables[tbl][ch])tables[tbl][ch]=[];
+      }
+      continue;
+    }
+    if(line.startsWith('-A ')){
+      const r=parseRule(line,tbl);
+      if(r){
+        if(!tables[tbl][r.chain])tables[tbl][r.chain]=[];
+        tables[tbl][r.chain].push(r);
+      }
+    }
+  }
+  return{tables,policies};
+}
+
+// ═══════════════════════════════════════════════════════
+// MATCHER
+// ═══════════════════════════════════════════════════════
+function matchRule(rule,pkt){
+  function chk(v,neg){return neg?v:!v;}
+  if(rule.src!==null&&chk(matchCIDR(pkt.src,rule.src),rule.srcNeg))return{res:'no'};
+  if(rule.dst!==null&&chk(matchCIDR(pkt.dst,rule.dst),rule.dstNeg))return{res:'no'};
+  if(rule.proto!==null&&chk(pkt.proto.toLowerCase()===rule.proto,rule.protoNeg))return{res:'no'};
+  if(rule.iIn!==null&&chk((pkt.iIn||'')===rule.iIn,rule.iInNeg))return{res:'no'};
+  if(rule.iOut!==null&&chk((pkt.iOut||'')===rule.iOut,rule.iOutNeg))return{res:'no'};
+  if(rule.dport!==null&&pkt.dport!==rule.dport)return{res:'no'};
+  if(rule.sport!==null&&pkt.sport!==rule.sport)return{res:'no'};
+  if(rule.mportDports!==null&&!rule.mportDports.includes(pkt.dport))return{res:'no'};
+  if(rule.mportSports!==null&&!rule.mportSports.includes(pkt.sport))return{res:'no'};
+  if(rule.stateList!==null&&!rule.stateList.includes(pkt.state||'NEW'))return{res:'no'};
+  if(rule.ctstateList!==null&&!rule.ctstateList.includes(pkt.state||'NEW'))return{res:'no'};
+  if(rule.addrtype!==null)return{res:'unk',warn:'此模块需要内核信息，无法在浏览器中完全模拟'};
+
+  const m=pkt.modules||{};
+
+  // TCP flags
+  if(rule.tcpFlagsMask!==null){
+    if(!m.tcpFlagsMask)return{res:'unk',warn:'需要 TCP Flags 信息（在「模块匹配条件」中添加）'};
+    const pktSet=new Set(m.tcpFlagsComp||[]);
+    const rComp=new Set(rule.tcpFlagsComp||[]);
+    for(const f of rule.tcpFlagsMask){
+      if(pktSet.has(f)!==rComp.has(f))return{res:'no'};
+    }
+  }
+
+  // ICMP type
+  if(rule.icmpType!==null){
+    if(m.icmpType==null)return{res:'unk',warn:'需要 ICMP Type 信息（在「模块匹配条件」中添加）'};
+    if(parseInt(m.icmpType)!==parseInt(rule.icmpType))return{res:'no'};
+  }
+
+  // MAC source
+  if(rule.macSrc!==null){
+    if(!m.macSrc)return{res:'unk',warn:'需要源 MAC 地址（在「模块匹配条件」中添加）'};
+    if(m.macSrc.toLowerCase()!==rule.macSrc.toLowerCase())return{res:'no'};
+  }
+
+  // Mark
+  if(rule.markVal!==null){
+    if(m.mark==null)return{res:'unk',warn:'需要 Mark 值（在「模块匹配条件」中添加）'};
+    const pMark=parseInt(m.mark.val||m.mark,16)||0;
+    const rMark=parseInt(rule.markVal,16)||parseInt(rule.markVal)||0;
+    const rMask=rule.markMask?(parseInt(rule.markMask,16)||parseInt(rule.markMask)||0xFFFFFFFF):0xFFFFFFFF;
+    if((pMark&rMask)!==(rMark&rMask))return{res:'no'};
+  }
+
+  // TOS
+  if(rule.tosVal!==null){
+    if(m.tos==null)return{res:'unk',warn:'需要 TOS 值（在「模块匹配条件」中添加）'};
+    const pTos=parseInt(m.tos,16)||parseInt(m.tos)||0;
+    const rTos=parseInt(rule.tosVal,16)||parseInt(rule.tosVal)||0;
+    if(pTos!==rTos)return{res:'no'};
+  }
+
+  // TTL
+  if(rule.ttlOp!==null){
+    if(m.ttl==null)return{res:'unk',warn:'需要 TTL 值（在「模块匹配条件」中添加）'};
+    const pTtl=parseInt(m.ttl);
+    if(rule.ttlOp==='eq'&&pTtl!==rule.ttlVal)return{res:'no'};
+    if(rule.ttlOp==='gt'&&pTtl<=rule.ttlVal)return{res:'no'};
+    if(rule.ttlOp==='lt'&&pTtl>=rule.ttlVal)return{res:'no'};
+  }
+
+  // pkttype
+  if(rule.pktType!==null){
+    if(!m.pktType)return{res:'unk',warn:'需要包类型（在「模块匹配条件」中添加）'};
+    if(m.pktType!==rule.pktType)return{res:'no'};
+  }
+
+  // iprange src
+  if(rule.srcRange!==null){
+    if(!m.srcRange)return{res:'unk',warn:'需要源 IP 范围（在「模块匹配条件」中添加）'};
+    if(!ipInRange(pkt.src,rule.srcRange.start,rule.srcRange.end))return{res:'no'};
+  }
+
+  // iprange dst
+  if(rule.dstRange!==null){
+    if(!m.dstRange)return{res:'unk',warn:'需要目的 IP 范围（在「模块匹配条件」中添加）'};
+    if(!ipInRange(pkt.dst,rule.dstRange.start,rule.dstRange.end))return{res:'no'};
+  }
+
+  // connlimit
+  if(rule.connlimitAbove!==null){
+    if(m.connlimitAbove==null)return{res:'unk',warn:'此模块需要内核信息，无法在浏览器中完全模拟'};
+    if(parseInt(m.connlimitAbove)<=parseInt(rule.connlimitAbove))return{res:'no'};
+  }else if(rule.connlimit!==null&&rule.connlimitUpto===null){
+    if(m.connlimitAbove==null)return{res:'unk',warn:'此模块需要内核信息，无法在浏览器中完全模拟'};
+  }
+  if(rule.connlimitUpto!==null){
+    if(m.connlimitAbove==null)return{res:'unk',warn:'此模块需要内核信息，无法在浏览器中完全模拟'};
+    if(parseInt(m.connlimitAbove)>parseInt(rule.connlimitUpto))return{res:'no'};
+  }
+
+  // owner uid
+  if(rule.ownerUid!==null){
+    if(m.ownerUid==null)return{res:'unk',warn:'此模块需要内核信息，无法在浏览器中完全模拟'};
+    if(parseInt(m.ownerUid)!==parseInt(rule.ownerUid))return{res:'no'};
+  }else if(rule.owner!==null&&rule.ownerUid===null){
+    if(m.ownerUid==null)return{res:'unk',warn:'此模块需要内核信息，无法在浏览器中完全模拟'};
+  }
+
+  // string match
+  if(rule.stringVal!==null){
+    if(!m.stringVal)return{res:'unk',warn:'需要字符串内容（在「模块匹配条件」中添加）'};
+    if(!m.stringVal.includes(rule.stringVal))return{res:'no'};
+  }
+
+  // length
+  if(rule.lenMin!==null){
+    if(m.length==null)return{res:'unk',warn:'需要包长度（在「模块匹配条件」中添加）'};
+    const pl=parseInt(m.length);
+    if(pl<rule.lenMin||pl>rule.lenMax)return{res:'no'};
+  }
+
+  // physdev-in
+  if(rule.physdevIn!==null){
+    if(!m.physdevIn)return{res:'unk',warn:'需要物理入接口（在「模块匹配条件」中添加）'};
+    if(m.physdevIn!==rule.physdevIn)return{res:'no'};
+  }
+
+  // IP set (always unk - needs kernel)
+  if(rule.setName!==null)return{res:'unk',warn:'IP Set 需要内核信息，无法在浏览器中完全模拟'};
+
+  return{res:'match'};
+}
+
+const TERMINAL=new Set(['DROP','ACCEPT','REJECT','MASQUERADE','SNAT','DNAT','REDIRECT','RETURN']);
+
+function processChain(tables,policies,pkt,tbl,chain,depth){
+  if(depth>12)return{rr:[],verdict:'PASS'};
+  const rules=(tables[tbl]&&tables[tbl][chain])||[];
+  const rr=[];
+  for(const rule of rules){
+    const mr=matchRule(rule,pkt);
+    if(mr.res==='no'){rr.push({rule,matched:false});continue;}
+    if(mr.res==='unk'){rr.push({rule,matched:'unk',warn:mr.warn});continue;}
+    const tgt=rule.target;
+    if(tgt==='RETURN'){rr.push({rule,matched:true});return{rr,verdict:'RETURN'};}
+    if(TERMINAL.has(tgt)){rr.push({rule,matched:true});return{rr,verdict:tgt};}
+    if(tgt&&tables[tbl]&&tables[tbl][tgt]!==undefined){
+      const sub=processChain(tables,policies,pkt,tbl,tgt,depth+1);
+      rr.push({rule,matched:true,jumpTo:tgt,sub});
+      if(sub.verdict!=='RETURN'&&sub.verdict!=='PASS')return{rr,verdict:sub.verdict};
+      continue;
+    }
+    rr.push({rule,matched:true});
+  }
+  const pol=(policies[tbl]&&policies[tbl][chain])||'ACCEPT';
+  return{rr,verdict:pol==='-'?'PASS':pol};
+}
+
+function simulate(tables,policies,pkt,direction){
+  const path=CHAIN_PATHS[direction]||CHAIN_PATHS.inbound;
+  const steps=[];
+  let dropped=false,droppedVerdict=null,droppedNode=null;
+  let acceptedNode=null;
+  for(const nd of path){
+    if(nd.type==='ep'||nd.type==='rt'){
+      steps.push({...nd,nodeKey:nd.label});
+      continue;
+    }
+    const{table,chain}=nd;
+    const exists=!!(tables[table]&&tables[table][chain]!==undefined);
+    const nk=`${table}/${chain}`;
+    const st={nodeType:'chain',table,chain,nodeKey:nk,exists,rr:[],verdict:'PASS'};
+    if(!dropped&&exists){
+      const r=processChain(tables,policies,pkt,table,chain,0);
+      st.rr=r.rr;
+      const v=r.verdict;
+      if(v==='DROP'||v==='REJECT'){
+        st.verdict=v;dropped=true;droppedVerdict=v;droppedNode=nk;
+      }else if(v==='ACCEPT'){
+        st.verdict='ACCEPT';acceptedNode=nk;
+      }else if(v==='MASQUERADE'||v==='SNAT'||v==='DNAT'||v==='REDIRECT'){
+        st.verdict=v+'(pass)';
+      }else{st.verdict='PASS';}
+    }else if(dropped){st.verdict='SKIP';}
+    steps.push(st);
+  }
+  if(dropped)return{steps,finalVerdict:droppedVerdict,finalNode:droppedNode};
+  return{steps,finalVerdict:'ACCEPT',finalNode:acceptedNode};
+}
+
+// ═══════════════════════════════════════════════════════
+// LAYOUT  (snake two-row)
+// ═══════════════════════════════════════════════════════
+const NW=168,EW=114,NH=70,PAD=32,GAP=44,ROWGAP=90;
+
+function computeLayout(steps){
+  const items=steps.map(s=>({step:s,w:(s.type==='ep'||s.type==='rt')?EW:NW}));
+  const total=items.reduce((a,b)=>a+b.w+GAP,0)-GAP;
+  const ROW_SPLIT=Math.ceil(items.length/2);
+
+  if(total+2*PAD<=1900){
+    let x=PAD;
+    return items.map(it=>{const r={...it,x,y:PAD};x+=it.w+GAP;return r;});
+  }
+
+  // Snake layout: row1 left→right, row2 right→left
+  // row2[0] is positioned at same x as row1's last node → straight-down connector
+  const row1=items.slice(0,ROW_SPLIT),row2=items.slice(ROW_SPLIT);
+  const out=[];
+
+  let x=PAD;
+  for(const it of row1){out.push({...it,x,y:PAD});x+=it.w+GAP;}
+
+  // row2[0] aligned with last row1 node; subsequent nodes go leftward
+  const r1LastX=out[out.length-1].x;
+  let x2=r1LastX;
+  for(const it of row2){
+    out.push({...it,x:x2,y:PAD+NH+ROWGAP});
+    x2-=(it.w+GAP);
+  }
+
+  return out;
+}
+
+// ═══════════════════════════════════════════════════════
+// RENDERER
+// ═══════════════════════════════════════════════════════
+function esc(s){return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');}
+function escAttr(s){return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');}
+
+function shortRule(rule){return esc(rule.raw.replace(/^-A\s+\S+\s*/,''));}
+
+function copyRule(el){
+  const raw=el.dataset.raw;
+  if(!raw)return;
+  const doFlash=()=>{el.classList.add('copied');setTimeout(()=>el.classList.remove('copied'),700);};
+  if(navigator.clipboard){
+    navigator.clipboard.writeText(raw).then(doFlash).catch(()=>{});
+  }else{
+    const ta=document.createElement('textarea');
+    ta.value=raw;ta.style.position='fixed';ta.style.opacity='0';
+    document.body.appendChild(ta);ta.select();
+    try{document.execCommand('copy');doFlash();}catch(e){}
+    document.body.removeChild(ta);
+  }
+}
+
+function buildRuleHTML(rr,depth){
+  let h='';
+  for(const r of rr){
+    const ind=depth>0?' sub':'';
+    let icon='○',cls='';
+    if(r.matched===false){icon='✗';cls='r-gray';}
+    else if(r.matched==='unk'){icon='⚠';cls='r-warn';}
+    else{
+      const tgt=r.rule.target;
+      if(tgt==='DROP'){icon='✕';cls='r-hit vdrop';}
+      else if(tgt==='ACCEPT'){icon='✓';cls='r-hit vaccept';}
+      else if(tgt==='REJECT'){icon='✕';cls='r-hit vreject';}
+      else{icon='→';cls='r-hit';}
+    }
+    const warnTip=r.warn?` title="${esc(r.warn)}"` : '';
+    const warnIcon=r.warn?` <span${warnTip} style="cursor:help">⚠️</span>`:'';
+    const rawAttr=`data-raw="${escAttr(r.rule.raw)}" title="${escAttr(r.rule.raw)}"`;
+    h+=`<div class="ri${ind} ${cls}" ${rawAttr} onclick="copyRule(this)">
+      <span class="rs">${icon}</span>
+      <span class="rt2">${shortRule(r.rule)}${warnIcon}</span></div>`;
+    if(r.jumpTo&&r.sub){
+      h+=`<div class="ri sub"><span class="rs">↓</span>
+        <span class="rt2" style="color:var(--blue)">→ 链: ${esc(r.jumpTo)}</span></div>`;
+      h+=buildRuleHTML(r.sub.rr,depth+1);
+    }
+  }
+  return h;
+}
+
+function nodeCardHTML(pos){
+  const s=pos.step;
+  if(s.type==='ep')return`<div class="cnode ep" data-nk="${esc(s.nodeKey)}"
+    style="left:${pos.x}px;top:${pos.y}px">
+    <div class="nh"><div class="nc">${esc(s.label)}</div>
+    <div class="ep-sub">${esc(s.sub)}</div></div></div>`;
+  if(s.type==='rt')return`<div class="cnode rt" data-nk="${esc(s.nodeKey)}"
+    style="left:${pos.x}px;top:${pos.y}px">
+    <div class="nh"><div class="nc">${esc(s.label)}</div>
+    <div class="rt-sub">${esc(s.sub)}</div></div></div>`;
+  const{table,chain,rr,exists}=s;
+  const allRules=(parsed&&parsed.tables[table]&&parsed.tables[table][chain])||[];
+  const cnt=allRules.length;
+  const hasR=cnt>0;
+  const click=hasR?`onclick="toggleNode(this)"`:'';
+  return`<div class="cnode t-${table}${hasR?'':' no-rules'}" data-nk="${esc(s.nodeKey)}"
+    style="left:${pos.x}px;top:${pos.y}px">
+    <div class="nh" ${click}>
+      <div class="nt">${esc(table)}</div>
+      <div class="nc"><span>${esc(chain)}</span>
+        <div class="ncr">${cnt?`<span class="nc-cnt">${cnt}</span>`:''}
+        ${cnt?`<span class="nc-exp">▼</span>`:''}</div></div>
+    </div>
+    <div class="nrules" id="nr-${table}-${chain}">${buildRuleHTML(rr,0)}</div>
+  </div>`;
+}
+
+function renderAll(positions){
+  const viz=document.getElementById('viz');
+  viz.querySelectorAll('.cnode').forEach(e=>e.remove());
+  document.getElementById('empty').style.display='none';
+  let maxX=0,maxY=0;
+  let html='';
+  for(const pos of positions){
+    html+=nodeCardHTML(pos);
+    maxX=Math.max(maxX,pos.x+pos.w);
+    maxY=Math.max(maxY,pos.y+NH);
+  }
+  viz.insertAdjacentHTML('beforeend',html);
+  viz.style.width=(maxX+PAD)+'px';
+  viz.style.height=(maxY+PAD+80)+'px';
+  renderArrows(positions,maxX+PAD,maxY+PAD+80);
+}
+
+function renderArrows(positions,W,H){
+  const svg=document.getElementById('asvg');
+  svg.setAttribute('width',W);svg.setAttribute('height',H);
+  svg.innerHTML=`<defs>
+    <marker id="ah" markerWidth="9" markerHeight="7" refX="9" refY="3.5" orient="auto">
+      <polygon points="0 0,9 3.5,0 7" fill="var(--bd)"/></marker>
+    <marker id="ah-b" markerWidth="9" markerHeight="7" refX="9" refY="3.5" orient="auto">
+      <polygon points="0 0,9 3.5,0 7" fill="var(--blue)"/></marker>
+    <marker id="ah-g" markerWidth="9" markerHeight="7" refX="9" refY="3.5" orient="auto">
+      <polygon points="0 0,9 3.5,0 7" fill="var(--green)"/></marker>
+  </defs>`;
+  for(let i=0;i<positions.length-1;i++){
+    const a=positions[i],b=positions[i+1];
+    const sameRow=Math.abs(a.y-b.y)<4;
+    let d;
+    if(sameRow){
+      if(b.x>a.x){
+        // left→right
+        d=`M${a.x+a.w},${a.y+NH/2}L${b.x-7},${b.y+NH/2}`;
+      }else{
+        // right→left (snake row 2)
+        d=`M${a.x},${a.y+NH/2}L${b.x+b.w+7},${b.y+NH/2}`;
+      }
+    }else{
+      const cx1=a.x+a.w/2,cx2=b.x+b.w/2;
+      const isSnakeTurn=Math.abs(cx1-cx2)<Math.max(a.w,b.w);
+      if(isSnakeTurn){
+        // Straight down: bottom-center of a → top-center of b via smooth bezier
+        const y1bot=a.y+NH,y2top=b.y,midY=(y1bot+y2top)/2;
+        d=`M${cx1},${y1bot} C${cx1},${midY} ${cx2},${midY} ${cx2},${y2top}`;
+      }else{
+        // L-shape for other cross-row
+        const x1=a.x+a.w,y1=a.y+NH/2,x2=b.x,y2=b.y+NH/2;
+        d=`M${x1},${y1}L${x1+GAP/2},${y1}L${x1+GAP/2},${y2}L${x2-7},${y2}`;
+      }
+    }
+    svg.innerHTML+=`<path class="apath" d="${d}" marker-end="url(#ah)" data-ai="${i}"/>
+      <path class="aflw" d="${d}" data-fi="${i}"/>`;
+  }
+}
+
+function toggleNode(hdr){
+  const card=hdr.closest?hdr.closest('.cnode'):hdr.parentElement;
+  if(card)card.classList.toggle('expanded');
+}
+
+// ═══════════════════════════════════════════════════════
+// ANIMATION CONTROLLER
+// ═══════════════════════════════════════════════════════
+class AnimCtrl{
+  constructor(positions,simResult,speed){
+    this.pos=positions;
+    this.steps=simResult.steps;
+    this.final=simResult.finalVerdict;
+    this.finalNode=simResult.finalNode;
+    this.speed=speed;
+    this.paused=false;
+    this.stopped=false;
+    this._res=null;
+    this._pendingTimer=null;
+    this._currentAnim=null;
+  }
+  pause(){this.paused=true;}
+  resume(){this.paused=false;if(this._res){this._res();this._res=null;}}
+  stop(){
+    this.stopped=true;this.paused=false;
+    if(this._pendingTimer){clearTimeout(this._pendingTimer);this._pendingTimer=null;}
+    if(this._res){this._res();this._res=null;}
+    if(this._currentAnim){try{this._currentAnim.cancel();}catch(e){}this._currentAnim=null;}
+  }
+  wait(ms){
+    return new Promise(res=>{
+      const t=setTimeout(()=>{this._pendingTimer=null;res();},ms);
+      this._pendingTimer=t;
+    });
+  }
+  async waitIfPaused(){
+    if(this.paused)await new Promise(r=>{this._res=r;});
+  }
+  moveDot(x,y,animate){
+    const dot=document.getElementById('dot');
+    if(!animate){
+      if(this._currentAnim){try{this._currentAnim.cancel();}catch(e){}this._currentAnim=null;}
+      dot.style.left=x+'px';dot.style.top=y+'px';
+      return;
+    }
+    dot.classList.add('moving');
+    const fromLeft=dot.style.left||x+'px';
+    const fromTop=dot.style.top||y+'px';
+    const sp=SPEED[this.speed];
+    if(this._currentAnim){try{this._currentAnim.cancel();}catch(e){}this._currentAnim=null;}
+    const wa=dot.animate(
+      [{left:fromLeft,top:fromTop},{left:x+'px',top:y+'px'}],
+      {duration:sp.moveMs,easing:'cubic-bezier(0.34,1.0,0.64,1)',fill:'forwards'}
+    );
+    this._currentAnim=wa;
+    wa.onfinish=()=>{
+      dot.style.left=x+'px';dot.style.top=y+'px';
+      try{wa.cancel();}catch(e){}
+      if(this._currentAnim===wa)this._currentAnim=null;
+      dot.classList.remove('moving');
+    };
+  }
+  nodeCenter(pos){
+    return{x:pos.x+pos.w/2,y:pos.y+NH/2};
+  }
+  arrowActive(i,cls){
+    const p=document.querySelector(`[data-ai="${i}"]`);
+    const f=document.querySelector(`[data-fi="${i}"]`);
+    if(p){p.setAttribute('class','apath '+cls);p.setAttribute('marker-end',`url(#ah${cls==='done'?'-g':cls==='active'?'-b':''})`);}
+    if(f){f.setAttribute('class','aflw'+(cls==='active'?' on':''));}
+  }
+  nodeState(nk,state){
+    const el=document.querySelector(`[data-nk="${nk}"]`);
+    if(!el)return;
+    el.classList.remove('s-active','s-pass','s-drop');
+    if(state)el.classList.add('s-'+state);
+  }
+  infoSet(html){document.getElementById('info-ct').innerHTML=html;}
+  infoChain(step,ruleRaw){
+    const v=step.verdict;
+    let vbadge='';
+    if(v==='PASS')vbadge=`<span class="vbadge pass">PASS →</span>`;
+    else if(v==='DROP')vbadge=`<span class="vbadge drop">DROP ✕</span>`;
+    else if(v==='ACCEPT')vbadge=`<span class="vbadge accept">ACCEPT ✓</span>`;
+    else if(v==='REJECT')vbadge=`<span class="vbadge reject">REJECT ✕</span>`;
+    else if(v&&v!=='SKIP')vbadge=`<span class="vbadge pass">${esc(v)}</span>`;
+    const ruleHtml=ruleRaw?`<div class="il"><span class="il-lbl">当前规则</span>
+      <span class="il-val">${esc(ruleRaw)}</span></div>`:'';
+    this.infoSet(`<div class="il">
+      <span class="il-lbl">当前链</span>
+      <span class="il-val" style="color:${TC[step.table]||'var(--t2)'}">${esc(step.table)}/${esc(step.chain)}</span>
+      &nbsp;${vbadge}</div>${ruleHtml}`);
+  }
+  async run(){
+    const dot=document.getElementById('dot');
+    dot.style.display='block';dot.className='';
+    const sp=SPEED[this.speed];
+    const{pos}=this;
+    const c0=this.nodeCenter(pos[0]);
+    this.moveDot(c0.x,c0.y,false);
+    await this.wait(sp.nodeMs/2);
+    for(let i=0;i<pos.length;i++){
+      if(this.stopped)break;
+      await this.waitIfPaused();
+      const p=pos[i],s=p.step;
+      if(i>0){
+        const c=this.nodeCenter(p);
+        this.moveDot(c.x,c.y,true);
+        this.arrowActive(i-1,'active');
+        await this.wait(sp.moveMs+60);
+        if(this.stopped)break;
+        await this.waitIfPaused();
+      }
+      if(s.type==='ep'||s.type==='rt'){
+        if(i>0)this.arrowActive(i-1,'done');
+        await this.wait(sp.nodeMs/2);continue;
+      }
+      this.nodeState(s.nodeKey,'active');
+      this.infoChain(s,null);
+      if(s.rr&&s.rr.length>0&&this.speed===0){
+        const card=document.querySelector(`[data-nk="${s.nodeKey}"]`);
+        if(card&&!card.classList.contains('expanded'))card.classList.add('expanded');
+        await this.animRulesSlow(s,sp);
+      }else{
+        await this.wait(sp.nodeMs);
+      }
+      if(this.stopped)break;
+      await this.waitIfPaused();
+      const v=s.verdict;
+      if(v==='DROP'||v==='REJECT'){
+        this.nodeState(s.nodeKey,'drop');
+        dot.classList.add('vdrop');
+        this.infoChain(s,null);
+        await this.wait(300);
+        await this.spawnParticles(this.nodeCenter(p));
+        break;
+      }else if(v==='ACCEPT'){
+        this.nodeState(s.nodeKey,'pass');
+        dot.classList.add('vaccept');
+        this.arrowActive(i-1,'done');
+        this.infoChain(s,null);
+      }else if(v&&v!=='SKIP'&&v!=='PASS'){
+        this.nodeState(s.nodeKey,'pass');
+        this.arrowActive(i-1,'done');
+        this.infoChain(s,null);
+      }else{
+        this.nodeState(s.nodeKey,'pass');
+        if(i>0)this.arrowActive(i-1,'done');
+      }
+    }
+    if(!this.stopped)this.showFinal();
+  }
+  async animRulesSlow(step,sp){
+    const ctr=document.getElementById(`nr-${step.table}-${step.chain}`);
+    if(!ctr)return;
+    const ris=Array.from(ctr.querySelectorAll('.ri:not(.sub)'));
+    for(let i=0;i<ris.length;i++){
+      if(this.stopped)break;
+      await this.waitIfPaused();
+      const el=ris[i];
+      const rr=step.rr[i];
+      if(!rr)break;
+      el.classList.add('r-chk');
+      el.scrollIntoView({block:'nearest',behavior:'smooth'});
+      this.infoChain(step,rr.rule.raw);
+      await this.wait(sp.ruleMs);
+      if(this.stopped)break;
+      el.classList.remove('r-chk');
+      if(rr.matched===true){
+        const tgt=rr.rule.target;
+        if(tgt==='DROP')el.classList.add('r-hit','vdrop');
+        else if(tgt==='ACCEPT')el.classList.add('r-hit','vaccept');
+        else if(tgt==='REJECT')el.classList.add('r-hit','vreject');
+        else el.classList.add('r-hit');
+        break;
+      }else if(rr.matched==='unk'){el.classList.add('r-warn');}
+      else{el.classList.add('r-gray');}
+    }
+  }
+  async spawnParticles(center){
+    const ctr=document.getElementById('ptc');
+    const PARTICLE_COUNT=8;
+    const MIN_DIST=38,DIST_VARIANCE=26;
+    for(let i=0;i<PARTICLE_COUNT;i++){
+      const angle=(i/PARTICLE_COUNT)*Math.PI*2;
+      const dist=MIN_DIST+Math.random()*DIST_VARIANCE;
+      const dx=Math.round(Math.cos(angle)*dist);
+      const dy=Math.round(Math.sin(angle)*dist);
+      const p=document.createElement('div');
+      p.className='ptc';
+      p.style.cssText=`left:${center.x}px;top:${center.y}px;--dx:${dx}px;--dy:${dy}px;
+        background:hsl(${i*45},90%,60%)`;
+      ctr.appendChild(p);
+    }
+    await this.wait(800);
+    ctr.innerHTML='';
+  }
+  showFinal(){
+    const v=this.final;
+    let badge='',msg='';
+    if(v==='DROP'){badge=`<span class="vbadge drop">DROP ✕</span>`;msg='数据包被丢弃';}
+    else if(v==='ACCEPT'){badge=`<span class="vbadge accept">ACCEPT ✓</span>`;msg='数据包被接受';}
+    else if(v==='REJECT'){badge=`<span class="vbadge reject">REJECT ✕</span>`;msg='数据包被拒绝';}
+    else{badge=`<span class="vbadge pass">${esc(v)}</span>`;msg='追踪完成';}
+    const nodeHtml=this.finalNode?`<div class="il"><span class="il-lbl">命中位置</span>
+      <span class="il-val">${esc(this.finalNode)}</span></div>`:'';
+    this.infoSet(`<div class="il"><span class="il-lbl">最终结果</span>${badge}&nbsp;${msg}</div>${nodeHtml}`);
+    setCtrlState('done');
+  }
+}
+
+// ═══════════════════════════════════════════════════════
+// MODULE UI
+// ═══════════════════════════════════════════════════════
+const TCP_FLAGS=['SYN','ACK','FIN','RST','PSH','URG'];
+
+const MODULE_HTML={
+  'tcp-flags':()=>`<span class="mod-label">TCP Flags</span>
+    <div class="mod-tcpf">
+      <div class="mod-tcpf-grp">
+        <span class="mod-tcpf-lbl">检查位</span>
+        ${TCP_FLAGS.map(f=>`<label><input type="checkbox" class="tcpf-mask" value="${f}">${f}</label>`).join('')}
+      </div>
+      <div class="mod-tcpf-grp">
+        <span class="mod-tcpf-lbl">置位</span>
+        ${TCP_FLAGS.map(f=>`<label><input type="checkbox" class="tcpf-comp" value="${f}">${f}</label>`).join('')}
+      </div>
+    </div>`,
+  'icmp-type':()=>`<span class="mod-label">ICMP Type</span>
+    <input type="number" class="mod-inp" min="0" max="255" placeholder="0-255" style="width:80px">`,
+  'mac-src':()=>`<span class="mod-label">源 MAC</span>
+    <input type="text" class="mod-inp" placeholder="aa:bb:cc:dd:ee:ff" style="width:150px">`,
+  'mark':()=>`<span class="mod-label">Mark</span>
+    <input type="text" class="mod-inp mod-mark-val" placeholder="0x1 (值)" style="width:90px">
+    <input type="text" class="mod-inp mod-mark-mask" placeholder="0xff (掩码)" style="width:90px">`,
+  'tos':()=>`<span class="mod-label">TOS</span>
+    <input type="text" class="mod-inp" placeholder="0x10 或 16" style="width:100px">`,
+  'ttl':()=>`<span class="mod-label">TTL</span>
+    <input type="number" class="mod-inp" min="0" max="255" placeholder="64" style="width:80px">`,
+  'pkttype':()=>`<span class="mod-label">包类型</span>
+    <select class="mod-sel">
+      <option value="HOST">HOST</option>
+      <option value="BROADCAST">BROADCAST</option>
+      <option value="MULTICAST">MULTICAST</option>
+      <option value="OTHERHOST">OTHERHOST</option>
+    </select>`,
+  'iprange-src':()=>`<span class="mod-label">源 IP 范围</span>
+    <input type="text" class="mod-inp wide" placeholder="1.2.3.4-1.2.3.100">`,
+  'iprange-dst':()=>`<span class="mod-label">目的 IP 范围</span>
+    <input type="text" class="mod-inp wide" placeholder="1.2.3.4-1.2.3.100">`,
+  'connlimit':()=>`<span class="mod-label">连接数 &gt;</span>
+    <input type="number" class="mod-inp" min="0" placeholder="10" style="width:80px">`,
+  'owner-uid':()=>`<span class="mod-label">UID</span>
+    <input type="number" class="mod-inp" min="0" placeholder="1000" style="width:80px">`,
+  'string':()=>`<span class="mod-label">字符串</span>
+    <input type="text" class="mod-inp wide" placeholder="匹配字符串">
+    <select class="mod-sel">
+      <option value="bm">bm</option>
+      <option value="kmp">kmp</option>
+    </select>`,
+  'length':()=>`<span class="mod-label">包长度</span>
+    <input type="text" class="mod-inp" placeholder="N 或 N:M" style="width:100px">`,
+  'physdev-in':()=>`<span class="mod-label">物理入接口</span>
+    <input type="text" class="mod-inp" placeholder="eth0">`,
+  'ipset':()=>`<span class="mod-label">IP Set</span>
+    <input type="text" class="mod-inp mod-set-name" placeholder="集合名称" style="width:110px">
+    <select class="mod-sel mod-set-dir">
+      <option value="src">src</option>
+      <option value="dst">dst</option>
+    </select>`,
+};
+
+function addModule(key){
+  if(!key||!MODULE_HTML[key])return;
+  const row=document.createElement('div');
+  row.className='mod-row';row.dataset.mod=key;
+  row.innerHTML=MODULE_HTML[key]()+
+    `<button class="mod-rm" onclick="this.closest('.mod-row').remove();updateModHint()"
+      title="移除">×</button>`;
+  document.getElementById('mod-rows').appendChild(row);
+  updateModHint();
+}
+
+function updateModHint(){
+  const hint=document.getElementById('mod-hint');
+  if(!hint)return;
+  const rows=document.querySelectorAll('#mod-rows .mod-row');
+  hint.style.display=rows.length?'none':'';
+}
+
+function collectModules(){
+  const modules={
+    tcpFlagsMask:null,tcpFlagsComp:null,
+    icmpType:null,macSrc:null,
+    mark:null,tos:null,ttl:null,pktType:null,
+    srcRange:null,dstRange:null,
+    connlimitAbove:null,ownerUid:null,
+    stringVal:null,length:null,
+    physdevIn:null,setName:null,setDir:null,
+  };
+  document.querySelectorAll('#mod-rows .mod-row').forEach(row=>{
+    const key=row.dataset.mod;
+    switch(key){
+      case'tcp-flags':{
+        const mask=[...row.querySelectorAll('.tcpf-mask:checked')].map(c=>c.value);
+        const comp=[...row.querySelectorAll('.tcpf-comp:checked')].map(c=>c.value);
+        if(mask.length){modules.tcpFlagsMask=mask;modules.tcpFlagsComp=comp;}
+        break;}
+      case'icmp-type':{
+        const v=row.querySelector('.mod-inp').value.trim();
+        if(v!=='')modules.icmpType=v;break;}
+      case'mac-src':{
+        const v=row.querySelector('.mod-inp').value.trim();
+        if(v)modules.macSrc=v;break;}
+      case'mark':{
+        const val=row.querySelector('.mod-mark-val').value.trim();
+        const mask=row.querySelector('.mod-mark-mask').value.trim();
+        if(val)modules.mark={val,mask:mask||'0xFFFFFFFF'};break;}
+      case'tos':{
+        const v=row.querySelector('.mod-inp').value.trim();
+        if(v)modules.tos=v;break;}
+      case'ttl':{
+        const v=row.querySelector('.mod-inp').value.trim();
+        if(v!=='')modules.ttl=v;break;}
+      case'pkttype':{
+        modules.pktType=row.querySelector('.mod-sel').value;break;}
+      case'iprange-src':{
+        const v=row.querySelector('.mod-inp').value.trim();
+        if(v){const idx=v.indexOf('-');
+          if(idx>0)modules.srcRange={start:v.slice(0,idx),end:v.slice(idx+1)};}
+        break;}
+      case'iprange-dst':{
+        const v=row.querySelector('.mod-inp').value.trim();
+        if(v){const idx=v.indexOf('-');
+          if(idx>0)modules.dstRange={start:v.slice(0,idx),end:v.slice(idx+1)};}
+        break;}
+      case'connlimit':{
+        const v=row.querySelector('.mod-inp').value.trim();
+        if(v!=='')modules.connlimitAbove=v;break;}
+      case'owner-uid':{
+        const v=row.querySelector('.mod-inp').value.trim();
+        if(v!=='')modules.ownerUid=v;break;}
+      case'string':{
+        const v=row.querySelector('.mod-inp').value.trim();
+        if(v)modules.stringVal=v;break;}
+      case'length':{
+        const v=row.querySelector('.mod-inp').value.trim();
+        if(v)modules.length=v;break;}
+      case'physdev-in':{
+        const v=row.querySelector('.mod-inp').value.trim();
+        if(v)modules.physdevIn=v;break;}
+      case'ipset':{
+        const n=row.querySelector('.mod-set-name').value.trim();
+        const d=row.querySelector('.mod-set-dir').value;
+        if(n){modules.setName=n;modules.setDir=d;}break;}
+    }
+  });
+  return modules;
+}
+
+// ═══════════════════════════════════════════════════════
+// UI ACTIONS
+// ═══════════════════════════════════════════════════════
+function toggleInp(){
+  const inp=document.getElementById('inp');
+  const btn=document.getElementById('inp-toggle');
+  inp.classList.toggle('collapsed');
+  btn.textContent=inp.classList.contains('collapsed')?'▼ 展开':'▲ 收起';
+}
+
+function setSpeed(v){
+  curSpeed=v;
+  document.getElementById('spd-lbl').textContent=SPEED[v].name;
+}
+
+function setSt(msg,cls){
+  const el=document.getElementById('parse-st');
+  el.textContent=msg;el.className=cls||'';
+}
+
+function setCtrlState(state){
+  const bt=document.getElementById('btn-trace');
+  const bp=document.getElementById('btn-pause');
+  const br=document.getElementById('btn-reset');
+  if(state==='idle'){bt.disabled=false;bp.disabled=true;br.disabled=true;
+    bt.textContent='▶ 开始追踪';bp.textContent='⏸ 暂停';}
+  else if(state==='running'){bt.disabled=true;bp.disabled=false;br.disabled=false;
+    bp.textContent='⏸ 暂停';}
+  else if(state==='paused'){bt.disabled=false;bp.disabled=true;br.disabled=false;
+    bt.textContent='▶ 继续';bp.textContent='⏸ 暂停';}
+  else if(state==='done'){bt.disabled=false;bp.disabled=true;br.disabled=false;
+    bt.textContent='▶ 重新追踪';bp.textContent='⏸ 暂停';}
+}
+
+function doParseRules(){
+  const text=document.getElementById('rules-ta').value.trim();
+  if(!text){setSt('请输入规则','err');return;}
+  try{
+    parsed=parseIptablesSave(text);
+    const tcount=Object.keys(parsed.tables).length;
+    const rcount=Object.values(parsed.tables).reduce((a,t)=>
+      a+Object.values(t).reduce((b,c)=>b+c.length,0),0);
+    setSt(`✓ 解析完成：${tcount} 张表，${rcount} 条规则`,'ok');
+    const pkt=collectPkt();
+    if(pkt.ok){
+      const sim=simulate(parsed.tables,parsed.policies,pkt.pkt,pkt.pkt.direction);
+      layout=computeLayout(sim.steps);
+      renderAll(layout);
+      setCtrlState('idle');
+      document.getElementById('info-ct').innerHTML=
+        `<div class="il"><span class="il-lbl">就绪</span>
+        <span class="il-val">点击「开始追踪」开始动画</span></div>`;
+      const inp=document.getElementById('inp');
+      if(!inp.classList.contains('collapsed'))toggleInp();
+    }else{
+      const fakeSim=simulate(parsed.tables,parsed.policies,
+        {src:'1.1.1.1',dst:'2.2.2.2',proto:'tcp',dport:80,sport:0,
+         state:'NEW',iIn:'',iOut:'',direction:'inbound',modules:{}},
+        'inbound');
+      layout=computeLayout(fakeSim.steps);
+      renderAll(layout);
+      setCtrlState('idle');
+    }
+  }catch(e){setSt('解析出错: '+e.message,'err');console.error(e);}
+}
+
+function collectPkt(){
+  const src=document.getElementById('f-src').value.trim();
+  const dst=document.getElementById('f-dst').value.trim();
+  const proto=document.getElementById('f-proto').value;
+  const dportV=document.getElementById('f-dport').value.trim();
+  const sportV=document.getElementById('f-sport').value.trim();
+  const dir=document.getElementById('f-dir').value;
+  const state=document.getElementById('f-state').value;
+  const iIn=document.getElementById('f-iin').value.trim();
+  const iOut=document.getElementById('f-iout').value.trim();
+  if(!src||!dst)return{ok:false};
+  const dport=dportV?parseInt(dportV):null;
+  const sport=sportV?parseInt(sportV):null;
+  const modules=collectModules();
+  return{ok:true,pkt:{src,dst,proto,dport,sport,state,iIn,iOut,direction:dir,modules}};
+}
+
+function doStartTrace(){
+  if(anim){anim.stop();anim=null;}
+  if(!parsed){setSt('请先解析规则','err');return;}
+  const pkt=collectPkt();
+  if(!pkt.ok){setSt('请填写必填字段','err');return;}
+  document.querySelectorAll('.cnode').forEach(el=>el.classList.remove('s-active','s-pass','s-drop'));
+  document.querySelectorAll('.ri').forEach(el=>el.classList.remove('r-chk','r-skip','r-hit','vdrop',
+    'vaccept','vreject','r-warn','r-gray'));
+  document.querySelectorAll('.apath').forEach(el=>{el.setAttribute('class','apath');
+    el.setAttribute('marker-end','url(#ah)');});
+  document.querySelectorAll('.aflw').forEach(el=>el.setAttribute('class','aflw'));
+  document.getElementById('dot').className='';
+  const sim=simulate(parsed.tables,parsed.policies,pkt.pkt,pkt.pkt.direction);
+  layout=computeLayout(sim.steps);
+  renderAll(layout);
+  document.getElementById('btn-trace').textContent='▶ 开始追踪';
+  setCtrlState('running');
+  anim=new AnimCtrl(layout,sim,curSpeed);
+  anim.run().catch(e=>{console.warn(e);setCtrlState('idle');});
+}
+
+function doPause(){
+  if(!anim)return;
+  if(anim.paused){anim.resume();setCtrlState('running');}
+  else{anim.pause();setCtrlState('paused');}
+}
+
+function doReset(){
+  if(anim){anim.stop();anim=null;}
+  document.getElementById('dot').style.display='none';
+  document.getElementById('dot').className='';
+  document.getElementById('ptc').innerHTML='';
+  document.querySelectorAll('.cnode').forEach(el=>el.classList.remove('s-active','s-pass','s-drop'));
+  document.querySelectorAll('.ri').forEach(el=>el.classList.remove('r-chk','r-skip','r-hit',
+    'vdrop','vaccept','vreject','r-warn','r-gray'));
+  document.querySelectorAll('.apath').forEach(el=>{el.setAttribute('class','apath');
+    el.setAttribute('marker-end','url(#ah)');});
+  document.querySelectorAll('.aflw').forEach(el=>el.setAttribute('class','aflw'));
+  document.getElementById('info-ct').innerHTML=
+    '<div class="il"><span class="il-lbl">就绪</span><span class="il-val">点击「开始追踪」</span></div>';
+  document.getElementById('btn-trace').textContent='▶ 开始追踪';
+  document.getElementById('btn-pause').textContent='⏸ 暂停';
+  setCtrlState('idle');
+}
+
+// ═══════════════════════════════════════════════════════
+// INIT
+// ═══════════════════════════════════════════════════════
+window.addEventListener('DOMContentLoaded',()=>{
+  document.getElementById('rules-ta').value=DEFAULT_RULES;
+  setSpeed(1);
+  doParseRules();
+});
+</script>
+</body>
+</html>
